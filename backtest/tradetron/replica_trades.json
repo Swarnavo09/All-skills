@@ -1,0 +1,248 @@
+{
+ "summary": {
+  "settings": {
+   "start": "2024-10-17",
+   "end": "2026-10-17",
+   "qty": 130,
+   "maxProfit": 40000,
+   "maxLoss": 8000,
+   "tslAt": 16000,
+   "tslStep": 1600,
+   "tslBy": 1600,
+   "costPerTrade": 126,
+   "stAtrMode": "sma",
+   "vwapMode": "daily"
+  },
+  "positions": 22,
+  "wins": 7,
+  "winRate": 0.3181818181818182,
+  "net": 108976,
+  "avgWin": 35638.142857142855,
+  "avgLoss": -9366.066666666668,
+  "maxDDClosed": 71211,
+  "long": 17412,
+  "short": 91564
+ },
+ "trades": [
+  {
+   "side": "SHORT",
+   "entryDate": "2025-01-10",
+   "entry": 23503.05,
+   "exitDate": "2025-01-13",
+   "exit": 23195.36,
+   "gross": 40000,
+   "net": 39874,
+   "reason": "Take-profit"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2025-01-17",
+   "entry": 23272.05,
+   "exitDate": "2025-01-20",
+   "exit": 23333.59,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2025-02-28",
+   "entry": 22433.4,
+   "exitDate": "2025-02-28",
+   "exit": 22125.71,
+   "gross": 40000,
+   "net": 39874,
+   "reason": "Take-profit"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2025-08-29",
+   "entry": 24466.7,
+   "exitDate": "2025-08-29",
+   "exit": 24528.24,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2025-09-05",
+   "entry": 24708.2,
+   "exitDate": "2025-09-08",
+   "exit": 24802.6,
+   "gross": -12272,
+   "net": -12398,
+   "reason": "Stop-loss (gap)"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2025-09-18",
+   "entry": 25441.05,
+   "exitDate": "2025-09-18",
+   "exit": 25379.51,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2025-10-16",
+   "entry": 25394.9,
+   "exitDate": "2025-10-17",
+   "exit": 25702.59,
+   "gross": 40000,
+   "net": 39874,
+   "reason": "Take-profit"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2025-11-13",
+   "entry": 25934.55,
+   "exitDate": "2025-11-14",
+   "exit": 25767.9,
+   "gross": -21664,
+   "net": -21790,
+   "reason": "Stop-loss (gap)"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2025-11-20",
+   "entry": 26132.1,
+   "exitDate": "2025-11-20",
+   "exit": 26070.56,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2025-11-27",
+   "entry": 26261.25,
+   "exitDate": "2025-11-27",
+   "exit": 26199.71,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2025-12-04",
+   "entry": 26066.45,
+   "exitDate": "2025-12-05",
+   "exit": 25999.8,
+   "gross": -8665,
+   "net": -8791,
+   "reason": "Stop-loss (gap)"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2026-01-01",
+   "entry": 26187.95,
+   "exitDate": "2026-01-02",
+   "exit": 26126.41,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-01-23",
+   "entry": 25168.5,
+   "exitDate": "2026-01-27",
+   "exit": 25230.04,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-03-12",
+   "entry": 23674.85,
+   "exitDate": "2026-03-12",
+   "exit": 23736.39,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-03-13",
+   "entry": 23462.5,
+   "exitDate": "2026-03-13",
+   "exit": 23154.81,
+   "gross": 40000,
+   "net": 39874,
+   "reason": "Take-profit"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-04-02",
+   "entry": 22383.4,
+   "exitDate": "2026-04-02",
+   "exit": 22444.94,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-06-11",
+   "entry": 23104.4,
+   "exitDate": "2026-06-11",
+   "exit": 23165.94,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "LONG",
+   "entryDate": "2026-07-02",
+   "entry": 24062.2,
+   "exitDate": "2026-07-03",
+   "exit": 24375.65,
+   "gross": 40749,
+   "net": 40623,
+   "reason": "Take-profit (gap)"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-09-10",
+   "entry": 23431.5,
+   "exitDate": "2026-09-11",
+   "exit": 23357.65,
+   "gross": 9600,
+   "net": 9474,
+   "reason": "TSL"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-09-25",
+   "entry": 23035,
+   "exitDate": "2026-09-25",
+   "exit": 23096.54,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-10-01",
+   "entry": 22543.7,
+   "exitDate": "2026-10-01",
+   "exit": 22605.24,
+   "gross": -8000,
+   "net": -8126,
+   "reason": "Stop-loss"
+  },
+  {
+   "side": "SHORT",
+   "entryDate": "2026-10-08",
+   "entry": 22546.3,
+   "exitDate": "2026-10-08",
+   "exit": 22238.61,
+   "gross": 40000,
+   "net": 39874,
+   "reason": "Take-profit"
+  }
+ ]
+}
