@@ -50,20 +50,20 @@ Open **`dashboard.html`** in any browser. It works offline because the data and 
 Re-run with `node search.js && node analyze.js && node stage2.js && node combo.js` (about 2 minutes).
 
 ## Round 1: your original rules
-## Rules tested
+### Rules tested
 - **Long** (short is the mirror image): close > Supertrend(10,3), close > EMA21, EMA9 > EMA21, EMA18 > EMA42, close > VWAP, plus today's candle bullish and this week's candle bullish.
 - **Exit:** close < EMA18, stop loss ₹8K, target ₹40K, lock ₹1.6K once MTM reaches ₹16K, then raise the lock ₹1.6K for every further ₹1.6K.
 - **Size:** 2 lots of a synthetic future (ATM CE buy + PE sell).
 - **Expiry:** no entries on the monthly expiry day or the 2 trading days before it.
 
-## Data limits (important)
+### Data limits (important)
 The nse-bhavcopy and cm-market sources only provide **daily** NIFTY 50 OHLCV, with no 30-minute candles, no NIFTY futures and no option premiums. So:
 - The strategy runs on daily candles instead of 30-minute ones.
 - VWAP is weekly-anchored, using the index's typical price weighted by volume.
 - The synthetic future is modelled as spot points × quantity, minus carry (6.5% a year), minus ₹700 per round trip.
 - A daily candle doesn't show whether its high or its low came first, so the default assumes the adverse move came first.
 
-## Results (24 Nov 2025 to 23 Nov 2026, after costs)
+### Results (24 Nov 2025 to 23 Nov 2026, after costs)
 | Variant | Trades | Net | Win % | PF | Max DD |
 |---|---|---|---|---|---|
 | A. As specified | 40 | **−₹91,593** | 17.5% | 0.68 | ₹1,30,151 |
