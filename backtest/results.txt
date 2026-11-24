@@ -1,0 +1,45 @@
+
+== A: As specified: SL 8K / TGT 40K / lock 16K->1.6K, trail 1.6K
+trades 40 | net -Rs 91,593 | win 17.5% | PF 0.68 | avgW Rs 27,930 avgL -Rs 8,700 | maxDD Rs 1,30,151 | ret -22.9% | costs Rs 28,000 | skipped(expiry) 7
+  by side {"LONG":{"n":17,"net":-91900,"wins":3},"SHORT":{"n":23,"net":307,"wins":4}}
+  by exit {"Stop loss":{"n":33,"net":-287100,"wins":0},"Trail SL":{"n":4,"net":42000,"wins":4},"Target":{"n":3,"net":153507,"wins":3}}
+
+== A_opt: As specified, optimistic intrabar order (upper bound)
+trades 43 | net Rs 64,300 | win 39.5% | PF 1.28 | avgW Rs 17,088 avgL -Rs 8,700 | maxDD Rs 81,100 | ret 16.1% | costs Rs 30,100 | skipped(expiry) 7
+  by side {"LONG":{"n":19,"net":-48500,"wins":5},"SHORT":{"n":24,"net":112800,"wins":12}}
+  by exit {"Stop loss":{"n":26,"net":-226200,"wins":0},"Trail SL":{"n":13,"net":133300,"wins":13},"Target":{"n":4,"net":157200,"wins":4}}
+
+== A_close: As specified, entry at signal-candle close
+trades 39 | net Rs 54,676 | win 30.8% | PF 1.16 | avgW Rs 32,701 avgL -Rs 12,509 | maxDD Rs 1,00,982 | ret 13.7% | costs Rs 27,300 | skipped(expiry) 7
+  by side {"LONG":{"n":17,"net":-66921,"wins":4},"SHORT":{"n":22,"net":121597,"wins":8}}
+  by exit {"Stop loss":{"n":27,"net":-337730,"wins":0},"Trail SL":{"n":4,"net":28995,"wins":4},"Target":{"n":8,"net":363411,"wins":8}}
+
+== B: A + re-entry only after signal resets
+trades 29 | net -Rs 1,39,942 | win 10.3% | PF 0.38 | avgW Rs 28,753 avgL -Rs 8,700 | maxDD Rs 1,56,600 | ret -35.0% | costs Rs 20,300 | skipped(expiry) 7
+  by side {"LONG":{"n":13,"net":-76300,"wins":2},"SHORT":{"n":16,"net":-63642,"wins":1}}
+  by exit {"Stop loss":{"n":26,"net":-226200,"wins":0},"Trail SL":{"n":2,"net":19400,"wins":2},"Target":{"n":1,"net":66858,"wins":1}}
+
+== C: Recommended: SL 25K + re-entry reset
+trades 26 | net Rs 1,30,901 | win 53.8% | PF 1.43 | avgW Rs 30,894 avgL -Rs 25,135 | maxDD Rs 78,212 | ret 32.7% | costs Rs 18,200 | skipped(expiry) 6
+  by side {"LONG":{"n":11,"net":-10712,"wins":6},"SHORT":{"n":15,"net":141613,"wins":8}}
+  by exit {"Stop loss":{"n":11,"net":-287208,"wins":0},"EMA18 exit":{"n":1,"net":-14410,"wins":0},"Trail SL":{"n":6,"net":61400,"wins":6},"Target":{"n":8,"net":371119,"wins":8}}
+
+== C_opt: Recommended, optimistic intrabar order
+trades 26 | net Rs 7,982 | win 57.7% | PF 1.03 | avgW Rs 18,927 avgL -Rs 25,083 | maxDD Rs 94,711 | ret 2.0% | costs Rs 18,200 | skipped(expiry) 6
+  by side {"LONG":{"n":11,"net":-42712,"wins":6},"SHORT":{"n":15,"net":50694,"wins":9}}
+  by exit {"Stop loss":{"n":10,"net":-261508,"wins":0},"EMA18 exit":{"n":1,"net":-14410,"wins":0},"Trail SL":{"n":11,"net":126700,"wins":11},"Target":{"n":4,"net":157200,"wins":4}}
+
+== C_close: Recommended, entry at signal-candle close
+trades 28 | net Rs 1,95,537 | win 53.6% | PF 1.55 | avgW Rs 36,778 avgL -Rs 27,395 | maxDD Rs 99,133 | ret 48.9% | costs Rs 19,600 | skipped(expiry) 6
+  by side {"LONG":{"n":13,"net":1663,"wins":6},"SHORT":{"n":15,"net":193874,"wins":9}}
+  by exit {"Stop loss":{"n":13,"net":-356133,"wins":0},"Trail SL":{"n":3,"net":18495,"wins":3},"Target":{"n":12,"net":533175,"wins":12}}
+
+== C_long: Recommended, long only
+trades 11 | net -Rs 10,712 | win 54.5% | PF 0.91 | avgW Rs 18,500 avgL -Rs 24,342 | maxDD Rs 83,712 | ret -2.7% | costs Rs 7,700 | skipped(expiry) 2
+  by side {"LONG":{"n":11,"net":-10712,"wins":6}}
+  by exit {"Stop loss":{"n":4,"net":-107302,"wins":0},"EMA18 exit":{"n":1,"net":-14410,"wins":0},"Trail SL":{"n":4,"net":32400,"wins":4},"Target":{"n":2,"net":78600,"wins":2}}
+
+== C_short: Recommended, short only
+trades 15 | net Rs 1,41,613 | win 53.3% | PF 1.79 | avgW Rs 40,190 avgL -Rs 25,701 | maxDD Rs 51,400 | ret 35.4% | costs Rs 10,500 | skipped(expiry) 4
+  by side {"SHORT":{"n":15,"net":141613,"wins":8}}
+  by exit {"Trail SL":{"n":2,"net":29000,"wins":2},"Stop loss":{"n":7,"net":-179906,"wins":0},"Target":{"n":6,"net":292519,"wins":6}}

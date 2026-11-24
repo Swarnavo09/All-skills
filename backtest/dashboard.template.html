@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synthetic Futures Backtest</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: #e1e0d9;
+  --s1: #2a78d6; --s2: #eb6834; --s7: #6250d6;
+  --up: #0ca30c; --down: #d03b3b; --up-text: #006300; --down-text: #b02e2e;
+  --up-fill: rgba(12,163,12,.10); --down-fill: rgba(208,59,59,.10);
+  --warn-bg: #fff6df; --warn-border: #fab219;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+    --s1: #3987e5; --s2: #d95926; --s7: #9085e9;
+    --up: #0ca30c; --down: #e66767; --up-text: #2fbf2f; --down-text: #ef7d7d;
+    --up-fill: rgba(12,163,12,.16); --down-fill: rgba(230,103,103,.16);
+    --warn-bg: #2b2412; --warn-border: #c98500;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+  --s1: #3987e5; --s2: #d95926; --s7: #9085e9;
+  --up: #0ca30c; --down: #e66767; --up-text: #2fbf2f; --down-text: #ef7d7d;
+  --up-fill: rgba(12,163,12,.16); --down-fill: rgba(230,103,103,.16);
+  --warn-bg: #2b2412; --warn-border: #c98500;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }
+h2 { font-size: 15px; margin: 0 0 10px; }
+.sub { color: var(--ink-2); margin: 0; }
+.muted { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 14px; min-width: 0; }
+.note { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 10px 14px; margin-top: 14px; color: var(--ink); }
+.note b { font-weight: 600; }
+button, select, input { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 8px; }
+button { cursor: pointer; }
+button.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.seg { display: inline-flex; gap: 0; }
+.seg button { border-radius: 0; margin-left: -1px; }
+.seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 6px 6px 0; }
+.controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 14px; }
+.controls label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-2); }
+.controls input[type=number], .controls select { width: 100%; }
+.controls .chk { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+.presetbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.kpi .l { font-size: 12px; color: var(--ink-2); }
+.kpi .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .d { font-size: 12px; color: var(--muted); }
+.pos { color: var(--up-text); } .neg { color: var(--down-text); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.legend i.box { height: 10px; width: 10px; border-radius: 2px; }
+.tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); border: 1px solid var(--axis); border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; max-width: 260px; font-variant-numeric: tabular-nums; }
+.tip .t { font-weight: 600; margin-bottom: 3px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+.tip .r b { color: var(--ink); font-weight: 500; }
+.tablewrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 500; cursor: pointer; user-select: none; }
+th:first-child, td:first-child, th.l, td.l { text-align: left; }
+tbody tr:hover { background: var(--surface-2); cursor: pointer; }
+tr.sel { background: var(--surface-2); outline: 1px solid var(--axis); }
+.tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--axis); color: var(--ink-2); }
+.heat td { text-align: center; font-weight: 500; }
+.heat td.rowh, .heat th { text-align: center; }
+.heat td.rowh { text-align: left; color: var(--ink-2); font-weight: 400; }
+ul.notes { margin: 0; padding-left: 18px; color: var(--ink-2); }
+ul.notes li { margin: 4px 0; }
+.flex { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>NIFTY synthetic futures: trend strategy backtest</h1>
+      <p class="sub" id="subtitle"></p>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <button data-theme-btn="light">Light</button><button data-theme-btn="auto">Auto</button><button data-theme-btn="dark">Dark</button>
+    </div>
+  </header>
+
+  <div class="note"><b>Read this first:</b> the NSE bhavcopy source only has <b>daily</b> candles, with no 30-minute bars and no option premiums. So every rule here runs on daily candles, and the synthetic future (buy ATM CE + sell ATM PE) is modelled as NIFTY spot points × quantity, minus the cost of carry. A daily candle doesn't show whether its high or its low came first, so the backtest assumes the worse order by default (switch it under <i>Intrabar order</i>). Treat these results as directional evidence, not a verdict on the 30-minute version.</div>
+
+  <section class="card">
+    <div class="presetbar">
+      <b>Preset</b>
+      <div class="seg" id="presets">
+        <button data-preset="spec">As specified</button>
+        <button data-preset="rec">Recommended</button>
+      </div>
+      <span class="muted" id="presetDesc"></span>
+    </div>
+    <div class="controls" id="controls"></div>
+  </section>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <div class="flex"><h2>Equity curve (daily mark-to-market, after costs)</h2><span class="muted" id="eqNote"></span></div>
+    <div class="legend" id="eqLegend"></div>
+    <div class="chart" id="eqChart"></div>
+    <h2 style="margin-top:14px">Drawdown</h2>
+    <div class="chart" id="ddChart"></div>
+  </section>
+
+  <section class="card">
+    <div class="flex"><h2>NIFTY 50 daily, with trades</h2><span class="muted">Click a trade in the log to highlight it</span></div>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>EMA 18 (exit)</span>
+      <span><i style="background:var(--s7)"></i>Supertrend (10,3)</span>
+      <span><i class="box" style="background:var(--up-fill);border:1px solid var(--up)"></i>Winning trade</span>
+      <span><i class="box" style="background:var(--down-fill);border:1px solid var(--down)"></i>Losing trade</span>
+      <span>▲ long entry · ▼ short entry · ● exit</span>
+    </div>
+    <div class="chart" id="pxChart"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Monthly P&amp;L</h2>
+      <div class="chart" id="moChart"></div>
+    </section>
+    <section class="card">
+      <h2>Breakdown</h2>
+      <div id="breakdown"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="flex"><h2>Robustness: net P&amp;L by stop loss, entry timing and intrabar order</h2><span class="muted">Everything else as currently set</span></div>
+    <div class="tablewrap" id="heat"></div>
+  </section>
+
+  <section class="card">
+    <div class="flex"><h2>Trade log</h2><span class="muted" id="tradeCount"></span></div>
+    <div class="tablewrap" id="trades"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Signals skipped (monthly expiry block)</h2>
+      <div class="tablewrap" id="skipped" style="max-height:260px"></div>
+    </section>
+    <section class="card">
+      <h2>Assumptions</h2>
+      <ul class="notes" id="assumptions"></ul>
+    </section>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+const BARS = /*__DATA__*/;
+const META = /*__META__*/;
+
+const PRESETS = {
+  spec: { label: 'Rules exactly as given: SL ₹8K, target ₹40K, lock ₹16K→₹1.6K, trail ₹1.6K per ₹1.6K, re-enter on any signal.', p: {} },
+  rec:  { label: 'Same entries and exits, but SL ₹25K (about 1× daily ATR on 2 lots) and no same-side re-entry until the signal has switched off.', p: { stopLoss: 25000, reentry: 'reset' } },
+};
+const FIELDS = [
+  ['stopLoss', 'Stop loss (₹)', 'num', 1000], ['target', 'Target (₹)', 'num', 1000],
+  ['lockAt', 'Lock when MTM ≥ (₹)', 'num', 400], ['lockTo', 'Lock profit at (₹)', 'num', 400],
+  ['trailStep', 'Every further (₹)', 'num', 400], ['trailBy', 'Raise lock by (₹)', 'num', 400],
+  ['lots', 'Lots', 'num', 1], ['costPerTrade', 'Cost / round trip (₹)', 'num', 100],
+  ['capital', 'Capital for return % (₹)', 'num', 50000],
+  ['entryMode', 'Entry fill', 'sel', [['nextOpen', 'Next day open'], ['close', 'Signal candle close']]],
+  ['intrabar', 'Intrabar order', 'sel', [['adverseFirst', 'Adverse first (conservative)'], ['favourableFirst', 'Favourable first']]],
+  ['reentry', 'Re-entry', 'sel', [['immediate', 'On any signal'], ['reset', 'After signal resets']]],
+  ['skipExpiryDays', 'Skip days before monthly expiry', 'num', 1],
+  ['allowLong', 'Longs', 'chk'], ['allowShort', 'Shorts', 'chk'],
+  ['useVwap', 'VWAP filter', 'chk'], ['useHtf', 'Daily + weekly candle filter', 'chk'],
+];
+
+let params = Object.assign({}, Engine.DEFAULTS, PRESETS.rec.p);
+let preset = 'rec';
+let res = null, base = null, selTrade = null;
+
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const inr = x => (x < 0 ? '−' : '') + '₹' + Math.abs(Math.round(x)).toLocaleString('en-IN');
+const inrC = x => { const a = Math.abs(x), s = x < 0 ? '−' : ''; return a >= 1e5 ? s + '₹' + (a / 1e5).toFixed(a >= 1e6 ? 1 : 2).replace(/\.?0+$/, '') + 'L' : a >= 1e3 ? s + '₹' + (a / 1e3).toFixed(0) + 'K' : s + '₹' + Math.round(a); };
+const pct = x => (x * 100).toFixed(1) + '%';
+const cls = x => x > 0 ? 'pos' : x < 0 ? 'neg' : '';
+const fmtDate = d => { const [y, m, dd] = d.split('-'); return dd + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m - 1] + ' ' + y.slice(2); };
+const svgNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+// ---------- theme ----------
+function setTheme(t) {
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('bt-theme', t); } catch (e) {}
+  document.querySelectorAll('[data-theme-btn]').forEach(b => b.classList.toggle('active', b.dataset.themeBtn === t));
+  if (res) renderCharts();
+}
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.onclick = () => setTheme(b.dataset.themeBtn));
+let savedTheme = 'auto'; try { savedTheme = localStorage.getItem('bt-theme') || 'auto'; } catch (e) {}
+setTheme(savedTheme);
+
+// ---------- controls ----------
+function buildControls() {
+  const c = $('#controls'); c.innerHTML = '';
+  FIELDS.forEach(([k, label, type, opt]) => {
+    const lab = document.createElement('label');
+    if (type === 'chk') {
+      lab.className = 'chk';
+      lab.innerHTML = `<input type="checkbox" data-k="${k}" ${params[k] ? 'checked' : ''}> ${label}`;
+    } else if (type === 'sel') {
+      lab.innerHTML = `${label}<select data-k="${k}">${opt.map(([v, t]) => `<option value="${v}" ${params[k] === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    } else {
+      lab.innerHTML = `${label}<input type="number" data-k="${k}" step="${opt}" value="${params[k]}">`;
+    }
+    c.appendChild(lab);
+  });
+  c.querySelectorAll('[data-k]').forEach(inp => inp.onchange = () => {
+    const k = inp.dataset.k;
+    params[k] = inp.type === 'checkbox' ? inp.checked : inp.tagName === 'SELECT' ? inp.value : +inp.value;
+    preset = null; markPreset(); run();
+  });
+}
+function markPreset() {
+  document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+  $('#presetDesc').textContent = preset ? PRESETS[preset].label : 'Custom parameters';
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+  preset = b.dataset.preset; params = Object.assign({}, Engine.DEFAULTS, PRESETS[preset].p);
+  buildControls(); markPreset(); run();
+});
+
+// ---------- run ----------
+function run() {
+  res = Engine.run(BARS, params);
+  base = Engine.run(BARS, Object.assign({}, Engine.DEFAULTS, { intrabar: params.intrabar, entryMode: params.entryMode, costPerTrade: params.costPerTrade }));
+  selTrade = null;
+  renderKPIs(); renderCharts(); renderBreakdown(); renderTrades(); renderSkipped(); renderHeat(); renderAssumptions();
+}
+function renderCharts() { renderEquity(); renderPrice(); renderMonthly(); }
+
+function renderKPIs() {
+  const s = res.stats;
+  const k = [
+    ['Net P&L', inr(s.net), cls(s.net), `${pct(s.returnPct)} on ${inrC(params.capital)} capital`],
+    ['Trades', s.trades, '', `${s.bySide.LONG ? s.bySide.LONG.n : 0} long · ${s.bySide.SHORT ? s.bySide.SHORT.n : 0} short`],
+    ['Win rate', pct(s.winRate), '', `longest losing run: ${s.maxLossStreak}`],
+    ['Profit factor', isFinite(s.profitFactor) ? s.profitFactor.toFixed(2) : '∞', s.profitFactor >= 1 ? 'pos' : 'neg', 'gross wins ÷ gross losses'],
+    ['Max drawdown', inr(-s.maxDD), 'neg', s.maxDDDate ? 'trough ' + fmtDate(s.maxDDDate) : ''],
+    ['Avg win', inrC(s.avgWin), 'pos', 'avg loss ' + inrC(s.avgLoss) + ' · expectancy ' + inrC(s.expectancy) + '/trade'],
+    ['Costs paid', inr(s.costs), '', inr(params.costPerTrade) + ' per round trip'],
+    ['Time in market', pct(s.exposureDays / s.totalDays), '', `${s.exposureDays} of ${s.totalDays} sessions`],
+  ];
+  $('#kpis').innerHTML = k.map(([l, v, c, d]) => `<div class="kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div><div class="d">${d}</div></div>`).join('');
+  $('#subtitle').textContent = `${fmtDate(res.equity[0].date)} to ${fmtDate(res.equity[res.equity.length - 1].date)} · ${res.equity.length} sessions · ${params.lots} lots · NSE bhavcopy daily data`;
+}
+
+// ---------- generic helpers ----------
+function linScale(d0, d1, r0, r1) { const f = x => r0 + (x - d0) / (d1 - d0 || 1) * (r1 - r0); f.inv = y => d0 + (y - r0) / (r1 - r0) * (d1 - d0); return f; }
+function niceTicks(min, max, n) {
+  const span = max - min || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+  const out = []; for (let v = Math.floor(min / step) * step; v < max + step - 1e-9; v += step) out.push(+v.toFixed(6)); return out;
+}
+function monthTicks(dates) { const out = []; let prev = ''; dates.forEach((d, i) => { const m = d.slice(0, 7); if (m !== prev) { out.push([i, d]); prev = m; } }); return out; }
+function frame(container, h, padL) {
+  container.innerHTML = '';
+  const w = Math.max(320, container.clientWidth);
+  const svg = el('svg', { viewBox: `0 0 ${w} ${h}`, height: h, role: 'img' }, container);
+  return { svg, w, h, pad: { l: padL || 58, r: 12, t: 10, b: 24 } };
+}
+function xAxis(f, x, dates) {
+  const g = el('g', {}, f.svg);
+  const ticks = monthTicks(dates); const every = f.w < 560 ? 2 : 1; let lastX = -1e9;
+  ticks.forEach(([i, d], k) => {
+    if (k % every || x(i) - lastX < 34) return; lastX = x(i);
+    el('line', { x1: x(i), x2: x(i), y1: f.pad.t, y2: f.h - f.pad.b, stroke: css('--grid'), 'stroke-width': 1 }, g);
+    const t = el('text', { x: x(i) + 3, y: f.h - 7, fill: css('--muted'), 'font-size': 11 }, g);
+    t.textContent = fmtDate(d).slice(3);
+  });
+}
+function yAxis(f, y, ticks, fmt) {
+  const g = el('g', {}, f.svg);
+  ticks.forEach(v => {
+    el('line', { x1: f.pad.l, x2: f.w - f.pad.r, y1: y(v), y2: y(v), stroke: v === 0 ? css('--axis') : css('--grid'), 'stroke-width': 1 }, g);
+    const t = el('text', { x: f.pad.l - 6, y: y(v) + 4, fill: css('--muted'), 'font-size': 11, 'text-anchor': 'end' }, g);
+    t.textContent = fmt(v);
+  });
+}
+function path(points) { return points.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(''); }
+const tip = $('#tip');
+function showTip(ev, html) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = tip.getBoundingClientRect(); let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+function hover(f, onMove) {
+  const rect = el('rect', { x: f.pad.l, y: f.pad.t, width: f.w - f.pad.l - f.pad.r, height: f.h - f.pad.t - f.pad.b, fill: 'transparent' }, f.svg);
+  const vline = el('line', { y1: f.pad.t, y2: f.h - f.pad.b, stroke: css('--muted'), 'stroke-width': 1, 'stroke-dasharray': '3 3', visibility: 'hidden' }, f.svg);
+  const toLocal = ev => { const b = f.svg.getBoundingClientRect(); return (ev.clientX - b.left) * f.w / b.width; };
+  rect.addEventListener('mousemove', ev => { const xx = toLocal(ev); const vx = onMove(ev, xx); if (vx != null) { vline.setAttribute('x1', vx); vline.setAttribute('x2', vx); vline.setAttribute('visibility', 'visible'); } });
+  rect.addEventListener('mouseleave', () => { hideTip(); vline.setAttribute('visibility', 'hidden'); });
+  return rect;
+}
+
+// ---------- equity + drawdown ----------
+function renderEquity() {
+  const eq = res.equity, be = base.equity, dates = eq.map(e => e.date);
+  const showBase = preset !== 'spec';
+  $('#eqLegend').innerHTML = `<span><i style="background:var(--s1)"></i>Current settings (${inrC(res.stats.net)})</span>` +
+    (showBase ? `<span><i style="background:var(--s2)"></i>As specified (${inrC(base.stats.net)})</span>` : '');
+  $('#eqNote').textContent = 'Each day = closed P&L + open MTM at close';
+  const f = frame($('#eqChart'), 280, 64);
+  const vals = eq.map(e => e.equity).concat(showBase ? be.map(e => e.equity) : []).concat([0]);
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 5);
+  const y = linScale(ticks[0], ticks[ticks.length - 1], f.h - f.pad.b, f.pad.t);
+  const x = linScale(0, eq.length - 1, f.pad.l, f.w - f.pad.r);
+  yAxis(f, y, ticks, inrC); xAxis(f, x, dates);
+  if (showBase) el('path', { d: path(be.map((e, i) => [x(i), y(e.equity)])), fill: 'none', stroke: css('--s2'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, f.svg);
+  el('path', { d: path(eq.map((e, i) => [x(i), y(e.equity)])), fill: 'none', stroke: css('--s1'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, f.svg);
+  const dot1 = el('circle', { r: 4, fill: css('--s1'), stroke: css('--surface'), 'stroke-width': 2, visibility: 'hidden' }, f.svg);
+  const dot2 = el('circle', { r: 4, fill: css('--s2'), stroke: css('--surface'), 'stroke-width': 2, visibility: 'hidden' }, f.svg);
+  const r = hover(f, (ev, xx) => {
+    const i = Math.max(0, Math.min(eq.length - 1, Math.round(x.inv(xx))));
+    dot1.setAttribute('cx', x(i)); dot1.setAttribute('cy', y(eq[i].equity)); dot1.setAttribute('visibility', 'visible');
+    if (showBase) { dot2.setAttribute('cx', x(i)); dot2.setAttribute('cy', y(be[i].equity)); dot2.setAttribute('visibility', 'visible'); }
+    showTip(ev, `<div class="t">${fmtDate(eq[i].date)}</div><div class="r">Current <b>${inr(eq[i].equity)}</b></div>` + (showBase ? `<div class="r">As specified <b>${inr(be[i].equity)}</b></div>` : ''));
+    return x(i);
+  });
+  r.addEventListener('mouseleave', () => { dot1.setAttribute('visibility', 'hidden'); dot2.setAttribute('visibility', 'hidden'); });
+
+  // drawdown
+  const g = frame($('#ddChart'), 140, 64);
+  let peak = 0; const dd = eq.map(e => { peak = Math.max(peak, e.equity); return e.equity - peak; });
+  const dticks = niceTicks(Math.min(...dd, -1000), 0, 3);
+  const y2 = linScale(dticks[0], 0, g.h - g.pad.b, g.pad.t);
+  const x2 = linScale(0, eq.length - 1, g.pad.l, g.w - g.pad.r);
+  yAxis(g, y2, dticks, inrC); xAxis(g, x2, dates);
+  const pts = dd.map((v, i) => [x2(i), y2(v)]);
+  el('path', { d: path(pts) + `L${x2(dd.length - 1)},${y2(0)}L${x2(0)},${y2(0)}Z`, fill: css('--down-fill'), stroke: 'none' }, g.svg);
+  el('path', { d: path(pts), fill: 'none', stroke: css('--down'), 'stroke-width': 1.5 }, g.svg);
+  hover(g, (ev, xx) => { const i = Math.max(0, Math.min(dd.length - 1, Math.round(x2.inv(xx)))); showTip(ev, `<div class="t">${fmtDate(eq[i].date)}</div><div class="r">Drawdown <b>${inr(dd[i])}</b></div>`); return x2(i); });
+}
+
+// ---------- price chart ----------
+function renderPrice() {
+  const s0 = res.series.startIdx, bars = BARS.slice(s0), n = bars.length;
+  const f = frame($('#pxChart'), 380, 58);
+  const lo = Math.min(...bars.map(b => b.l)), hi = Math.max(...bars.map(b => b.h));
+  const ticks = niceTicks(lo, hi, 6);
+  const y = linScale(Math.min(ticks[0], lo), Math.max(ticks[ticks.length - 1], hi), f.h - f.pad.b, f.pad.t);
+  const x = linScale(-0.5, n - 0.5, f.pad.l, f.w - f.pad.r);
+  const bw = Math.max(1, (f.w - f.pad.l - f.pad.r) / n * 0.6);
+  yAxis(f, y, ticks, v => v.toLocaleString('en-IN')); xAxis(f, x, bars.map(b => b.date));
+  // trade spans
+  res.trades.forEach(t => {
+    const a = t.entryIdx - s0, b = t.exitIdx - s0, win = t.net > 0;
+    el('rect', { x: x(a - 0.5), y: f.pad.t, width: Math.max(2, x(b + 0.5) - x(a - 0.5)), height: f.h - f.pad.t - f.pad.b,
+      fill: css(win ? '--up-fill' : '--down-fill'), stroke: selTrade === t.id ? css('--ink') : 'none', 'stroke-width': 1.5 }, f.svg);
+  });
+  // candles
+  const g = el('g', {}, f.svg);
+  bars.forEach((b, i) => {
+    const up = b.c >= b.o, col = css(up ? '--up' : '--down');
+    el('line', { x1: x(i), x2: x(i), y1: y(b.h), y2: y(b.l), stroke: col, 'stroke-width': 1 }, g);
+    el('rect', { x: x(i) - bw / 2, y: y(Math.max(b.o, b.c)), width: bw, height: Math.max(1, Math.abs(y(b.o) - y(b.c))), fill: col }, g);
+  });
+  const line = (arr, color, w) => el('path', { d: path(arr.slice(s0).map((v, i) => [x(i), y(v)])), fill: 'none', stroke: color, 'stroke-width': w, 'stroke-linejoin': 'round' }, f.svg);
+  // supertrend drawn per-direction segments
+  const st = res.series.st.slice(s0), sd = res.series.stDir.slice(s0);
+  let seg = [];
+  const flush = () => { if (seg.length > 1) el('path', { d: path(seg), fill: 'none', stroke: css('--s7'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, f.svg); seg = []; };
+  st.forEach((v, i) => { if (i && sd[i] !== sd[i - 1]) flush(); seg.push([x(i), y(v)]); }); flush();
+  line(res.series.e18, css('--s1'), 2);
+  // markers
+  res.trades.forEach(t => {
+    const a = t.entryIdx - s0, b = t.exitIdx - s0, long = t.side === 'LONG';
+    const ex = x(a), ey = y(t.entry), sz = 6;
+    el('path', { d: long ? `M${ex},${ey - sz}L${ex + sz},${ey + sz}L${ex - sz},${ey + sz}Z` : `M${ex},${ey + sz}L${ex + sz},${ey - sz}L${ex - sz},${ey - sz}Z`,
+      fill: css('--ink'), stroke: css('--surface'), 'stroke-width': 1.5 }, f.svg);
+    el('circle', { cx: x(b), cy: y(t.exit), r: 4.5, fill: css(t.net > 0 ? '--up' : '--down'), stroke: css('--surface'), 'stroke-width': 2 }, f.svg);
+  });
+  const byIdx = {}; res.trades.forEach(t => { for (let i = t.entryIdx; i <= t.exitIdx; i++) byIdx[i - s0] = t; });
+  hover(f, (ev, xx) => {
+    const i = Math.max(0, Math.min(n - 1, Math.round(x.inv(xx)))), b = bars[i], gi = i + s0, t = byIdx[i];
+    showTip(ev, `<div class="t">${fmtDate(b.date)}</div>
+      <div class="r">O / H <b>${b.o.toFixed(1)} / ${b.h.toFixed(1)}</b></div><div class="r">L / C <b>${b.l.toFixed(1)} / ${b.c.toFixed(1)}</b></div>
+      <div class="r">EMA 9 / 21 <b>${res.series.e9[gi].toFixed(0)} / ${res.series.e21[gi].toFixed(0)}</b></div>
+      <div class="r">EMA 18 / 42 <b>${res.series.e18[gi].toFixed(0)} / ${res.series.e42[gi].toFixed(0)}</b></div>
+      <div class="r">Supertrend <b>${res.series.st[gi].toFixed(0)} ${res.series.stDir[gi] > 0 ? '↑' : '↓'}</b></div>
+      <div class="r">Weekly VWAP <b>${res.series.vwap[gi].toFixed(0)}</b></div>` +
+      (t ? `<div class="r" style="margin-top:4px">Trade #${t.id} ${t.side} <b class="${cls(t.net)}">${inr(t.net)}</b></div>` : ''));
+    return x(i);
+  });
+}
+
+// ---------- monthly ----------
+function renderMonthly() {
+  const m = Object.entries(res.stats.monthly);
+  const f = frame($('#moChart'), 240, 56);
+  const vals = m.map(e => e[1]).concat([0]);
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 4);
+  const y = linScale(ticks[0], ticks[ticks.length - 1], f.h - f.pad.b, f.pad.t);
+  yAxis(f, y, ticks, inrC);
+  const bwAll = (f.w - f.pad.l - f.pad.r) / m.length, bw = Math.min(28, bwAll - 4);
+  m.forEach(([k, v], i) => {
+    const cx = f.pad.l + bwAll * (i + 0.5), y0 = y(0), y1 = y(v), top = Math.min(y0, y1), h = Math.max(1, Math.abs(y1 - y0));
+    const r = Math.min(4, h / 2), col = css(v >= 0 ? '--up' : '--down');
+    // rounded data-end, flat at baseline
+    const d = v >= 0
+      ? `M${cx - bw / 2},${y0}V${top + r}Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top}H${cx + bw / 2 - r}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r}V${y0}Z`
+      : `M${cx - bw / 2},${y0}V${top + h - r}Q${cx - bw / 2},${top + h} ${cx - bw / 2 + r},${top + h}H${cx + bw / 2 - r}Q${cx + bw / 2},${top + h} ${cx + bw / 2},${top + h - r}V${y0}Z`;
+    el('path', { d, fill: col }, f.svg);
+    if (i % (bwAll < 50 ? 2 : 1) === 0) { const t = el('text', { x: cx, y: f.h - 7, 'text-anchor': 'middle', fill: css('--muted'), 'font-size': 11 }, f.svg); t.textContent = fmtDate(k + '-01').slice(3); }
+    const hit = el('rect', { x: cx - bwAll / 2, y: f.pad.t, width: bwAll, height: f.h - f.pad.t - f.pad.b, fill: 'transparent' }, f.svg);
+    hit.addEventListener('mousemove', ev => showTip(ev, `<div class="t">${fmtDate(k + '-01').slice(3)}</div><div class="r">P&amp;L <b class="${cls(v)}">${inr(v)}</b></div>`));
+    hit.addEventListener('mouseleave', hideTip);
+  });
+}
+
+// ---------- tables ----------
+function renderBreakdown() {
+  const s = res.stats;
+  const row = (k, o) => `<tr><td class="l">${k}</td><td>${o.n}</td><td>${o.n ? pct(o.wins / o.n) : '–'}</td><td class="${cls(o.net)}">${inr(o.net)}</td></tr>`;
+  $('#breakdown').innerHTML = `<table><thead><tr><th class="l">By side</th><th>Trades</th><th>Win %</th><th>Net</th></tr></thead><tbody>${Object.entries(s.bySide).map(([k, o]) => row(k, o)).join('')}</tbody></table>
+  <table style="margin-top:14px"><thead><tr><th class="l">By exit reason</th><th>Trades</th><th>Win %</th><th>Net</th></tr></thead><tbody>${Object.entries(s.byReason).sort((a, b) => b[1].n - a[1].n).map(([k, o]) => row(k, o)).join('')}</tbody></table>`;
+}
+
+let sortKey = 'id', sortDir = 1;
+function renderTrades() {
+  const cols = [['id', '#'], ['side', 'Side', 'l'], ['entryDate', 'Entry', 'l'], ['entry', 'Entry px'], ['exitDate', 'Exit', 'l'], ['exit', 'Exit px'], ['qty', 'Qty'], ['points', 'Points'], ['bars', 'Days'], ['mfe', 'Best MTM'], ['gross', 'Gross'], ['cost', 'Costs'], ['net', 'Net'], ['reason', 'Exit reason', 'l']];
+  const rows = res.trades.slice().sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
+  $('#tradeCount').textContent = `${res.trades.length} trades · click a header to sort`;
+  $('#trades').innerHTML = `<table><thead><tr>${cols.map(([k, t, c]) => `<th class="${c || ''}" data-sort="${k}">${t}${sortKey === k ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead><tbody>${rows.map(t => `<tr data-id="${t.id}" class="${selTrade === t.id ? 'sel' : ''}">
+    <td>${t.id}</td><td class="l"><span class="tag">${t.side}</span></td><td class="l">${fmtDate(t.entryDate)}</td><td>${t.entry.toFixed(1)}</td><td class="l">${fmtDate(t.exitDate)}</td><td>${t.exit.toFixed(1)}</td>
+    <td>${t.qty}</td><td class="${cls(t.points)}">${t.points.toFixed(1)}</td><td>${t.bars}</td><td>${inr(t.mfe)}</td><td class="${cls(t.gross)}">${inr(t.gross)}</td><td>${inr(-t.cost)}</td><td class="${cls(t.net)}"><b>${inr(t.net)}</b></td><td class="l">${t.reason}</td></tr>`).join('')}</tbody></table>`;
+  $('#trades').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.sort; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; renderTrades(); });
+  $('#trades').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => { selTrade = +tr.dataset.id; renderTrades(); renderPrice(); $('#pxChart').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+}
+function renderSkipped() {
+  const s = res.skipped;
+  $('#skipped').innerHTML = s.length ? `<table><thead><tr><th class="l">Entry day</th><th class="l">Side</th><th class="l">Why</th></tr></thead><tbody>${s.map(k => `<tr><td class="l">${fmtDate(k.date)}</td><td class="l">${k.dir > 0 ? 'LONG' : 'SHORT'}</td><td class="l">${k.why === 'expiry' ? 'Monthly expiry day' : 'Within ' + params.skipExpiryDays + ' sessions of monthly expiry'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">None.</p>';
+}
+function renderHeat() {
+  const sls = [8000, 12000, 16000, 20000, 25000, 30000];
+  const combos = [['nextOpen', 'adverseFirst', 'Next open · adverse first'], ['nextOpen', 'favourableFirst', 'Next open · favourable first'], ['close', 'adverseFirst', 'Signal close · adverse first'], ['close', 'favourableFirst', 'Signal close · favourable first']];
+  const grid = combos.map(([em, ib]) => sls.map(sl => Engine.run(BARS, Object.assign({}, params, { stopLoss: sl, entryMode: em, intrabar: ib })).stats.net));
+  const maxAbs = Math.max(...grid.flat().map(Math.abs), 1);
+  const cell = v => { const a = Math.min(1, Math.abs(v) / maxAbs) * 0.55 + 0.05; const c = v >= 0 ? '12,163,12' : '208,59,59'; return `<td style="background:rgba(${c},${a.toFixed(2)})">${inrC(v)}</td>`; };
+  $('#heat').innerHTML = `<table class="heat"><thead><tr><th class="l">Entry · intrabar order \\ Stop loss</th>${sls.map(s => `<th>${inrC(s)}${s === params.stopLoss ? ' •' : ''}</th>`).join('')}</tr></thead><tbody>${grid.map((r, i) => `<tr><td class="rowh">${combos[i][2]}${combos[i][0] === params.entryMode && combos[i][1] === params.intrabar ? ' •' : ''}</td>${r.map(cell).join('')}</tr>`).join('')}</tbody></table>
+  <p class="muted" style="margin:8px 0 0">• marks the current setting. Settings that only work in one cell are fragile; look for a block that stays green across rows.</p>`;
+}
+function renderAssumptions() {
+  const p = params;
+  const items = [
+    `Data: NIFTY 50 daily OHLC and index volume from NSE bhavcopy (${META.first} to ${META.last}). Indicators warm up on bars before ${fmtDate(p.startDate)}; the trading window starts on that date.`,
+    `Timeframe: daily candles stand in for the 30-minute chart. The "daily and weekly candle bullish" filter becomes: today's close > today's open, and close > this week's opening price (bearish is the mirror image).`,
+    `VWAP: the bhavcopy has no NIFTY futures, so VWAP is anchored weekly on the index's (high+low+close)/3, weighted by index volume. On a daily chart this plays the same role as session VWAP on a 30-minute chart.`,
+    `Entry: all 7 conditions (Supertrend 10,3 · close vs EMA21 · EMA9 vs EMA21 · EMA18 vs EMA42 · VWAP · daily candle · weekly candle) must hold at the close. Fill: ${p.entryMode === 'close' ? 'at that close' : 'at the next session open (no look-ahead)'}. One position at a time.`,
+    `Exit: first of stop loss ${inr(p.stopLoss)}, target ${inr(p.target)}, trailing lock (at ${inr(p.lockAt)} MTM lock ${inr(p.lockTo)}, then +${inr(p.trailBy)} for every +${inr(p.trailStep)}), or a daily close beyond EMA ${p.emaExit}. Gap opens beyond a level fill at the open.`,
+    `Quantity: ${p.lots} lots × ${p.lotSizeOld} until 30 Dec 2025, then ${p.lots} lots × ${p.lotSizeNew} (NSE lot-size revision). The rupee stop and target stay fixed, so their distance in points changes slightly when the lot size changes.`,
+    `Synthetic future: P&L = points × quantity minus cost of carry (${(p.carryRate * 100).toFixed(1)}% a year on spot; longs pay it, shorts earn it). Options-side effects (IV, skew, bid/ask on the two legs) are folded into ${inr(p.costPerTrade)} per round trip, plus ${inr(p.rollCost)} if a position is held through a monthly expiry.`,
+    `Expiry rule: no fresh entry on the monthly expiry day (last Tuesday, or the previous trading day if that's a holiday) or the ${p.skipExpiryDays} trading days before it. Open positions are not forced out.`,
+    `Not modelled: intraday path inside a daily candle, slippage beyond the fixed cost, margin calls, taxes on profit.`,
+  ];
+  $('#assumptions').innerHTML = items.map(i => `<li>${i}</li>`).join('');
+}
+
+buildControls(); markPreset(); run();
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderCharts, 150); });
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderCharts());
+</script>
+</body>
+</html>

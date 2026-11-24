@@ -1,0 +1,11 @@
+[
+  {"id":"A","name":"As specified: SL 8K / TGT 40K / lock 16K->1.6K, trail 1.6K","params":{}},
+  {"id":"A_opt","name":"As specified, optimistic intrabar order (upper bound)","params":{"intrabar":"favourableFirst"}},
+  {"id":"A_close","name":"As specified, entry at signal-candle close","params":{"entryMode":"close"}},
+  {"id":"B","name":"A + re-entry only after signal resets","params":{"reentry":"reset"}},
+  {"id":"C","name":"Recommended: SL 25K + re-entry reset","params":{"stopLoss":25000,"reentry":"reset"}},
+  {"id":"C_opt","name":"Recommended, optimistic intrabar order","params":{"stopLoss":25000,"reentry":"reset","intrabar":"favourableFirst"}},
+  {"id":"C_close","name":"Recommended, entry at signal-candle close","params":{"stopLoss":25000,"reentry":"reset","entryMode":"close"}},
+  {"id":"C_long","name":"Recommended, long only","params":{"stopLoss":25000,"reentry":"reset","allowShort":false}},
+  {"id":"C_short","name":"Recommended, short only","params":{"stopLoss":25000,"reentry":"reset","allowLong":false}}
+]

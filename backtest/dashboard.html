@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synthetic Futures Backtest</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: #e1e0d9;
+  --s1: #2a78d6; --s2: #eb6834; --s7: #6250d6;
+  --up: #0ca30c; --down: #d03b3b; --up-text: #006300; --down-text: #b02e2e;
+  --up-fill: rgba(12,163,12,.10); --down-fill: rgba(208,59,59,.10);
+  --warn-bg: #fff6df; --warn-border: #fab219;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+    --s1: #3987e5; --s2: #d95926; --s7: #9085e9;
+    --up: #0ca30c; --down: #e66767; --up-text: #2fbf2f; --down-text: #ef7d7d;
+    --up-fill: rgba(12,163,12,.16); --down-fill: rgba(230,103,103,.16);
+    --warn-bg: #2b2412; --warn-border: #c98500;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+  --s1: #3987e5; --s2: #d95926; --s7: #9085e9;
+  --up: #0ca30c; --down: #e66767; --up-text: #2fbf2f; --down-text: #ef7d7d;
+  --up-fill: rgba(12,163,12,.16); --down-fill: rgba(230,103,103,.16);
+  --warn-bg: #2b2412; --warn-border: #c98500;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 16px 48px; }
+header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+h1 { font-size: 22px; margin: 0 0 2px; letter-spacing: -.01em; }
+h2 { font-size: 15px; margin: 0 0 10px; }
+.sub { color: var(--ink-2); margin: 0; }
+.muted { color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 14px; min-width: 0; }
+.note { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 10px 14px; margin-top: 14px; color: var(--ink); }
+.note b { font-weight: 600; }
+button, select, input { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--axis); border-radius: 6px; padding: 5px 8px; }
+button { cursor: pointer; }
+button.active { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.seg { display: inline-flex; gap: 0; }
+.seg button { border-radius: 0; margin-left: -1px; }
+.seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 6px 6px 0; }
+.controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 14px; }
+.controls label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-2); }
+.controls input[type=number], .controls select { width: 100%; }
+.controls .chk { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+.presetbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.kpi .l { font-size: 12px; color: var(--ink-2); }
+.kpi .v { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .d { font-size: 12px; color: var(--muted); }
+.pos { color: var(--up-text); } .neg { color: var(--down-text); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.legend i.box { height: 10px; width: 10px; border-radius: 2px; }
+.tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); border: 1px solid var(--axis); border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; max-width: 260px; font-variant-numeric: tabular-nums; }
+.tip .t { font-weight: 600; margin-bottom: 3px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+.tip .r b { color: var(--ink); font-weight: 500; }
+.tablewrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 500; cursor: pointer; user-select: none; }
+th:first-child, td:first-child, th.l, td.l { text-align: left; }
+tbody tr:hover { background: var(--surface-2); cursor: pointer; }
+tr.sel { background: var(--surface-2); outline: 1px solid var(--axis); }
+.tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--axis); color: var(--ink-2); }
+.heat td { text-align: center; font-weight: 500; }
+.heat td.rowh, .heat th { text-align: center; }
+.heat td.rowh { text-align: left; color: var(--ink-2); font-weight: 400; }
+ul.notes { margin: 0; padding-left: 18px; color: var(--ink-2); }
+ul.notes li { margin: 4px 0; }
+.flex { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>NIFTY synthetic futures: trend strategy backtest</h1>
+      <p class="sub" id="subtitle"></p>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <button data-theme-btn="light">Light</button><button data-theme-btn="auto">Auto</button><button data-theme-btn="dark">Dark</button>
+    </div>
+  </header>
+
+  <div class="note"><b>Read this first:</b> the NSE bhavcopy source only has <b>daily</b> candles, with no 30-minute bars and no option premiums. So every rule here runs on daily candles, and the synthetic future (buy ATM CE + sell ATM PE) is modelled as NIFTY spot points × quantity, minus the cost of carry. A daily candle doesn't show whether its high or its low came first, so the backtest assumes the worse order by default (switch it under <i>Intrabar order</i>). Treat these results as directional evidence, not a verdict on the 30-minute version.</div>
+
+  <section class="card">
+    <div class="presetbar">
+      <b>Preset</b>
+      <div class="seg" id="presets">
+        <button data-preset="spec">As specified</button>
+        <button data-preset="rec">Recommended</button>
+      </div>
+      <span class="muted" id="presetDesc"></span>
+    </div>
+    <div class="controls" id="controls"></div>
+  </section>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <div class="flex"><h2>Equity curve (daily mark-to-market, after costs)</h2><span class="muted" id="eqNote"></span></div>
+    <div class="legend" id="eqLegend"></div>
+    <div class="chart" id="eqChart"></div>
+    <h2 style="margin-top:14px">Drawdown</h2>
+    <div class="chart" id="ddChart"></div>
+  </section>
+
+  <section class="card">
+    <div class="flex"><h2>NIFTY 50 daily, with trades</h2><span class="muted">Click a trade in the log to highlight it</span></div>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>EMA 18 (exit)</span>
+      <span><i style="background:var(--s7)"></i>Supertrend (10,3)</span>
+      <span><i class="box" style="background:var(--up-fill);border:1px solid var(--up)"></i>Winning trade</span>
+      <span><i class="box" style="background:var(--down-fill);border:1px solid var(--down)"></i>Losing trade</span>
+      <span>▲ long entry · ▼ short entry · ● exit</span>
+    </div>
+    <div class="chart" id="pxChart"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Monthly P&amp;L</h2>
+      <div class="chart" id="moChart"></div>
+    </section>
+    <section class="card">
+      <h2>Breakdown</h2>
+      <div id="breakdown"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="flex"><h2>Robustness: net P&amp;L by stop loss, entry timing and intrabar order</h2><span class="muted">Everything else as currently set</span></div>
+    <div class="tablewrap" id="heat"></div>
+  </section>
+
+  <section class="card">
+    <div class="flex"><h2>Trade log</h2><span class="muted" id="tradeCount"></span></div>
+    <div class="tablewrap" id="trades"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Signals skipped (monthly expiry block)</h2>
+      <div class="tablewrap" id="skipped" style="max-height:260px"></div>
+    </section>
+    <section class="card">
+      <h2>Assumptions</h2>
+      <ul class="notes" id="assumptions"></ul>
+    </section>
+  </div>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+/*
+ * Synthetic-futures trend strategy backtest engine (NIFTY 50).
+ * One file, used by both node (run_backtest.js) and the offline dashboard,
+ * so the numbers in the report and on the dashboard come from the same code.
+ *
+ * Bars are DAILY bhavcopy candles (the MCP sources have no intraday data).
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Engine = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const DEFAULTS = {
+    startDate: '2025-11-24',     // backtest window start (earlier bars = indicator warm-up)
+    stAtr: 10, stMult: 3,         // Supertrend (10,3)
+    emaFast: 9, emaMid: 21, emaSlowA: 18, emaSlowB: 42, emaExit: 18,
+    useVwap: true,                // close vs weekly-anchored VWAP
+    useHtf: true,                 // daily + weekly candle colour filter
+    allowLong: true, allowShort: true,
+    entryMode: 'nextOpen',        // 'nextOpen' (no look-ahead) | 'close'
+    lots: 2,
+    lotSizeOld: 75, lotSizeNew: 65, lotChangeDate: '2025-12-31',
+    stopLoss: 8000, target: 40000,
+    lockAt: 16000, lockTo: 1600, trailStep: 1600, trailBy: 1600,
+    skipExpiryDays: 2,            // block fresh entries on the N trading days before monthly expiry (and expiry day)
+    intrabar: 'adverseFirst',     // daily bars can't tell if high or low came first: 'adverseFirst' (conservative) | 'favourableFirst'
+    reentry: 'immediate',         // 'immediate' | 'reset' (signal must switch off before same-side re-entry)
+    costPerTrade: 700,            // round-trip charges + slippage for 2 legs x 2 lots (Rs)
+    rollCost: 700,                // charged if a position is held through a monthly expiry
+    carryRate: 0.065,             // synthetic future carry (annual) - long pays, short earns
+    capital: 400000,              // assumed margin for 2-lot synthetic future
+  };
+
+  // ---------- indicators ----------
+  function ema(src, n) {
+    const out = new Array(src.length).fill(NaN);
+    const k = 2 / (n + 1);
+    let sum = 0;
+    for (let i = 0; i < src.length; i++) {
+      if (i < n - 1) { sum += src[i]; continue; }
+      if (i === n - 1) { sum += src[i]; out[i] = sum / n; continue; }
+      out[i] = src[i] * k + out[i - 1] * (1 - k);
+    }
+    return out;
+  }
+
+  function supertrend(bars, period, mult) {
+    const n = bars.length;
+    const tr = bars.map((b, i) => i === 0 ? b.h - b.l :
+      Math.max(b.h - b.l, Math.abs(b.h - bars[i - 1].c), Math.abs(b.l - bars[i - 1].c)));
+    const atr = new Array(n).fill(NaN);          // Wilder RMA, as TradingView
+    let s = 0;
+    for (let i = 0; i < n; i++) {
+      if (i < period) { s += tr[i]; if (i === period - 1) atr[i] = s / period; continue; }
+      atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+    }
+    const line = new Array(n).fill(NaN), dir = new Array(n).fill(0);
+    let up = NaN, dn = NaN, trend = 1;
+    for (let i = 0; i < n; i++) {
+      if (isNaN(atr[i])) continue;
+      const hl2 = (bars[i].h + bars[i].l) / 2;
+      let u = hl2 - mult * atr[i], d = hl2 + mult * atr[i];
+      if (!isNaN(up)) {
+        const pc = bars[i - 1].c;
+        u = pc > up ? Math.max(u, up) : u;
+        d = pc < dn ? Math.min(d, dn) : d;
+        if (trend === -1 && bars[i].c > dn) trend = 1;
+        else if (trend === 1 && bars[i].c < up) trend = -1;
+      }
+      up = u; dn = d;
+      dir[i] = trend; line[i] = trend === 1 ? up : dn;
+    }
+    return { line, dir, atr };
+  }
+
+  function weekKey(dateStr) {               // ISO week id
+    const d = new Date(dateStr + 'T00:00:00Z');
+    const day = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - day + 3);
+    const y = d.getUTCFullYear();
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const wk = 1 + Math.round(((d - jan4) / 864e5 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+    return y + '-W' + wk;
+  }
+
+  function weeklyContext(bars) {
+    // weekly-anchored VWAP (typical price x index volume) and week-to-date open
+    const vwap = [], wOpen = [];
+    let key = null, pv = 0, vv = 0, wo = NaN;
+    bars.forEach(b => {
+      const k = weekKey(b.date);
+      if (k !== key) { key = k; pv = 0; vv = 0; wo = b.o; }
+      const v = b.v || 1;
+      pv += ((b.h + b.l + b.c) / 3) * v; vv += v;
+      vwap.push(pv / vv); wOpen.push(wo);
+    });
+    return { vwap, wOpen };
+  }
+
+  // ---------- monthly expiry calendar (last Tuesday; previous trading day if holiday) ----------
+  function monthlyExpiries(bars) {
+    const dates = new Set(bars.map(b => b.date));
+    const last = bars[bars.length - 1].date;
+    const months = [...new Set(bars.map(b => b.date.slice(0, 7)))];
+    const res = {};
+    months.forEach(m => {
+      const [y, mo] = m.split('-').map(Number);
+      const d = new Date(Date.UTC(y, mo, 0));                // last day of month
+      while (d.getUTCDay() !== 2) d.setUTCDate(d.getUTCDate() - 1);
+      // NIFTY monthly expiry was last Thursday until Aug-2025
+      if (y < 2025 || (y === 2025 && mo < 9)) {
+        d.setTime(Date.UTC(y, mo, 0));
+        while (d.getUTCDay() !== 4) d.setUTCDate(d.getUTCDate() - 1);
+      }
+      let s = d.toISOString().slice(0, 10);
+      // shift to previous trading day if it was a holiday (only knowable inside the data range)
+      while (s <= last && !dates.has(s)) {
+        d.setUTCDate(d.getUTCDate() - 1); s = d.toISOString().slice(0, 10);
+      }
+      res[m] = s;
+    });
+    return res;
+  }
+
+  function blockedDates(bars, expiries, nDays) {
+    const blocked = {};
+    const idx = bars.map(b => b.date);
+    Object.values(expiries).forEach(e => {
+      blocked[e] = 'expiry';
+      const before = idx.filter(d => d < e).slice(-nDays);
+      before.forEach(d => { blocked[d] = 'pre-expiry'; });
+    });
+    return blocked;
+  }
+
+  // ---------- backtest ----------
+  function run(rawBars, userParams) {
+    const p = Object.assign({}, DEFAULTS, userParams || {});
+    const bars = rawBars;
+    const n = bars.length;
+    const closes = bars.map(b => b.c);
+    const e9 = ema(closes, p.emaFast), e21 = ema(closes, p.emaMid);
+    const e18 = ema(closes, p.emaSlowA), e42 = ema(closes, p.emaSlowB);
+    const eExit = p.emaExit === p.emaSlowA ? e18 : ema(closes, p.emaExit);
+    const st = supertrend(bars, p.stAtr, p.stMult);
+    const wk = weeklyContext(bars);
+    const expiries = monthlyExpiries(bars);
+    const blocked = blockedDates(bars, expiries, p.skipExpiryDays);
+    const expirySet = new Set(Object.values(expiries));
+    const startIdx = bars.findIndex(b => b.date >= p.startDate);
+
+    function conds(i) {
+      const b = bars[i];
+      const L = {
+        st: b.c > st.line[i], ema21: b.c > e21[i], e9_21: e9[i] > e21[i], e18_42: e18[i] > e42[i],
+        vwap: !p.useVwap || b.c > wk.vwap[i], day: !p.useHtf || b.c > b.o, week: !p.useHtf || b.c > wk.wOpen[i],
+      };
+      const S = {
+        st: b.c < st.line[i], ema21: b.c < e21[i], e9_21: e9[i] < e21[i], e18_42: e18[i] < e42[i],
+        vwap: !p.useVwap || b.c < wk.vwap[i], day: !p.useHtf || b.c < b.o, week: !p.useHtf || b.c < wk.wOpen[i],
+      };
+      const all = o => Object.values(o).every(Boolean);
+      return { L, S, long: p.allowLong && all(L), short: p.allowShort && all(S) };
+    }
+
+    const qtyFor = date => p.lots * (date < p.lotChangeDate ? p.lotSizeOld : p.lotSizeNew);
+    const trades = [], equity = [], signals = [], skipped = [];
+    let pos = null, realized = 0, pending = null;
+    let lockout = { 1: false, '-1': false };
+
+    function stopPnlFor(maxMtm) {
+      if (maxMtm >= p.lockAt) return p.lockTo + Math.floor((maxMtm - p.lockAt) / p.trailStep) * p.trailBy;
+      return -p.stopLoss;
+    }
+    function closePos(i, price, reason) {
+      const b = bars[i];
+      const carry = pos.entry * p.carryRate * daysBetween(pos.entryDate, b.date) / 365;
+      const gross = pos.dir * (price - pos.entry) * pos.qty - pos.dir * carry * pos.qty;
+      const cost = p.costPerTrade + pos.rolls * p.rollCost;
+      const net = gross - cost;
+      realized += net;
+      trades.push({
+        id: trades.length + 1, side: pos.dir === 1 ? 'LONG' : 'SHORT',
+        entryDate: pos.entryDate, entryIdx: pos.entryIdx, entry: round2(pos.entry),
+        exitDate: b.date, exitIdx: i, exit: round2(price), qty: pos.qty,
+        points: round2(pos.dir * (price - pos.entry)), carry: round0(-pos.dir * carry * pos.qty),
+        gross: round0(gross), cost: round0(cost), net: round0(net), reason,
+        bars: i - pos.entryIdx + 1, mfe: round0(pos.maxMtm), mae: round0(pos.minMtm), rolls: pos.rolls,
+      });
+      lockout[pos.dir] = p.reentry === 'reset';
+      pos = null;
+    }
+
+    for (let i = Math.max(startIdx, 1); i < n; i++) {
+      const b = bars[i];
+      let exitedThisBar = false;
+
+      // 1) fill pending next-open entry
+      if (pending && !pos) {
+        pos = { dir: pending.dir, entry: b.o, entryDate: b.date, entryIdx: i, qty: qtyFor(b.date),
+          maxMtm: 0, minMtm: 0, stopPnl: -p.stopLoss, rolls: 0, openFill: true, sigDate: pending.sigDate };
+        pending = null;
+      }
+
+      // 2) manage open position on this bar
+      if (pos && !(pos.entryIdx === i && !pos.openFill)) {
+        const d = pos.dir, q = pos.qty;
+        const carryPts = pos.entry * p.carryRate * daysBetween(pos.entryDate, b.date) / 365;
+        const px = pnl => pos.entry + carryPts + d * pnl / q;   // price at which MTM == pnl
+        const mtm = price => d * (price - pos.entry) * q - d * carryPts * q;
+        const fav = d === 1 ? b.h : b.l, adv = d === 1 ? b.l : b.h;
+        const beyond = (price, level, favourable) => favourable
+          ? (d === 1 ? price >= level : price <= level)
+          : (d === 1 ? price <= level : price >= level);
+        const isEntryBar = pos.entryIdx === i;
+        const stopPx = px(pos.stopPnl), tgtPx = px(p.target);
+        const stopReason = () => pos.stopPnl > 0 ? 'Trail SL' : 'Stop loss';
+
+        if (!isEntryBar && beyond(b.o, stopPx, false)) { closePos(i, b.o, stopReason() + ' (gap)'); }
+        else if (!isEntryBar && beyond(b.o, tgtPx, true)) { closePos(i, b.o, 'Target (gap)'); }
+        else {
+          pos.minMtm = Math.min(pos.minMtm, mtm(adv));
+          if (p.intrabar === 'favourableFirst') {                                         // optimistic bound
+            if (beyond(fav, tgtPx, true)) { pos.maxMtm = Math.max(pos.maxMtm, p.target); closePos(i, tgtPx, 'Target'); }
+            else {
+              pos.maxMtm = Math.max(pos.maxMtm, mtm(fav));
+              pos.stopPnl = Math.max(pos.stopPnl, stopPnlFor(pos.maxMtm));
+              if (beyond(adv, px(pos.stopPnl), false)) closePos(i, px(pos.stopPnl), stopReason());
+              else if (d === 1 ? b.c < eExit[i] : b.c > eExit[i]) closePos(i, b.c, 'EMA' + p.emaExit + ' exit');
+            }
+          }
+          else if (beyond(adv, stopPx, false)) { closePos(i, stopPx, stopReason()); }        // adverse first (conservative)
+          else if (beyond(fav, tgtPx, true)) { pos.maxMtm = Math.max(pos.maxMtm, p.target); closePos(i, tgtPx, 'Target'); }
+          else {
+            pos.maxMtm = Math.max(pos.maxMtm, mtm(fav));
+            const newStop = Math.max(pos.stopPnl, stopPnlFor(pos.maxMtm));
+            const raised = newStop > pos.stopPnl;
+            pos.stopPnl = newStop;
+            if (raised && beyond(b.c, px(newStop), false)) { closePos(i, px(newStop), 'Trail SL'); }
+            else if (d === 1 ? b.c < eExit[i] : b.c > eExit[i]) { closePos(i, b.c, 'EMA' + p.emaExit + ' exit'); }
+          }
+        }
+        if (!pos) exitedThisBar = true;
+        else if (expirySet.has(b.date)) pos.rolls++;
+      }
+
+      // 3) mark-to-market equity
+      let open = 0;
+      if (pos) {
+        const carry = pos.entry * p.carryRate * daysBetween(pos.entryDate, b.date) / 365;
+        open = pos.dir * (b.c - pos.entry) * pos.qty - pos.dir * carry * pos.qty;
+      }
+      equity.push({ date: b.date, equity: round0(realized + open), realized: round0(realized) });
+
+      // 4) look for a fresh signal at this close
+      const c = conds(i);
+      if (!c.long) lockout[1] = false;
+      if (!c.short) lockout[-1] = false;
+      if (!pos && !pending) {
+        let dir = c.long && !lockout[1] ? 1 : c.short && !lockout[-1] ? -1 : 0;
+        if (dir) {
+          const entryDate = p.entryMode === 'close' ? b.date : (bars[i + 1] ? bars[i + 1].date : null);
+          signals.push({ date: b.date, dir });
+          if (!entryDate) { /* last bar: signal only */ }
+          else if (blocked[entryDate]) skipped.push({ date: entryDate, dir, why: blocked[entryDate] });
+          else if (p.entryMode === 'close') {
+            pos = { dir, entry: b.c, entryDate: b.date, entryIdx: i, qty: qtyFor(b.date),
+              maxMtm: 0, minMtm: 0, stopPnl: -p.stopLoss, rolls: 0, openFill: false, sigDate: b.date };
+          } else pending = { dir, sigDate: b.date };
+        }
+      }
+      void exitedThisBar;
+    }
+    // close anything still open at the last close (marked as open MTM)
+    if (pos) closePos(n - 1, bars[n - 1].c, 'Open @ last close');
+
+    return {
+      params: p, trades, equity, signals, skipped, expiries,
+      stats: stats(trades, equity, p),
+      series: { e9, e21, e18, e42, st: st.line, stDir: st.dir, vwap: wk.vwap, startIdx },
+    };
+  }
+
+  function stats(trades, equity, p) {
+    const net = trades.reduce((a, t) => a + t.net, 0);
+    const wins = trades.filter(t => t.net > 0), losses = trades.filter(t => t.net <= 0);
+    const gw = wins.reduce((a, t) => a + t.net, 0), gl = -losses.reduce((a, t) => a + t.net, 0);
+    let peak = 0, mdd = 0, mddDate = null;
+    equity.forEach(e => { peak = Math.max(peak, e.equity); if (peak - e.equity > mdd) { mdd = peak - e.equity; mddDate = e.date; } });
+    let streak = 0, maxStreak = 0;
+    trades.forEach(t => { streak = t.net <= 0 ? streak + 1 : 0; maxStreak = Math.max(maxStreak, streak); });
+    const by = key => trades.reduce((m, t) => { const k = key(t); (m[k] = m[k] || { n: 0, net: 0, wins: 0 }); m[k].n++; m[k].net += t.net; if (t.net > 0) m[k].wins++; return m; }, {});
+    const monthly = {};
+    let prev = 0;
+    equity.forEach(e => { const m = e.date.slice(0, 7); monthly[m] = (monthly[m] || 0) + (e.equity - prev); prev = e.equity; });
+    Object.keys(monthly).forEach(k => monthly[k] = round0(monthly[k]));
+    return {
+      trades: trades.length, net: round0(net), gross: round0(trades.reduce((a, t) => a + t.gross, 0)),
+      costs: round0(trades.reduce((a, t) => a + t.cost, 0)),
+      winRate: trades.length ? wins.length / trades.length : 0,
+      avgWin: wins.length ? gw / wins.length : 0, avgLoss: losses.length ? -gl / losses.length : 0,
+      profitFactor: gl ? gw / gl : (gw ? Infinity : 0), expectancy: trades.length ? net / trades.length : 0,
+      maxDD: round0(mdd), maxDDDate: mddDate, maxLossStreak: maxStreak,
+      returnPct: net / p.capital, retToDD: mdd ? net / mdd : null,
+      bySide: by(t => t.side), byReason: by(t => t.reason.replace(' (gap)', '')), monthly,
+      exposureDays: trades.reduce((a, t) => a + t.bars, 0), totalDays: equity.length,
+    };
+  }
+
+  function daysBetween(a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 864e5); }
+  function round0(x) { return Math.round(x); }
+  function round2(x) { return Math.round(x * 100) / 100; }
+
+  return { run, DEFAULTS, ema, supertrend, monthlyExpiries };
+});
+
+</script>
+<script>
+const BARS = [{"date":"2024-11-25","o":24253.55,"h":24351.55,"l":24135.45,"c":24221.9,"v":687172787},{"date":"2024-11-26","o":24343.3,"h":24343.3,"l":24125.4,"c":24194.5,"v":230691771},{"date":"2024-11-27","o":24204.8,"h":24354.55,"l":24145.65,"c":24274.9,"v":295011445},{"date":"2024-11-28","o":24274.15,"h":24345.75,"l":23873.35,"c":23914.15,"v":366745300},{"date":"2024-11-29","o":23927.15,"h":24188.45,"l":23927.15,"c":24131.1,"v":282104071},{"date":"2024-12-02","o":24140.85,"h":24301.7,"l":24008.65,"c":24276.05,"v":220384187},{"date":"2024-12-03","o":24367.5,"h":24481.35,"l":24280,"c":24457.15,"v":339470947},{"date":"2024-12-04","o":24488.75,"h":24573.2,"l":24366.3,"c":24467.45,"v":348003156},{"date":"2024-12-05","o":24539.15,"h":24857.75,"l":24295.55,"c":24708.4,"v":361469920},{"date":"2024-12-06","o":24729.45,"h":24751.05,"l":24620.5,"c":24677.8,"v":226731303},{"date":"2024-12-09","o":24633.9,"h":24705,"l":24580.05,"c":24619,"v":248139308},{"date":"2024-12-10","o":24652.65,"h":24677.8,"l":24510.65,"c":24610.05,"v":261048951},{"date":"2024-12-11","o":24620.5,"h":24691.75,"l":24583.85,"c":24641.8,"v":187252712},{"date":"2024-12-12","o":24604.45,"h":24675.25,"l":24527.95,"c":24548.7,"v":266051129},{"date":"2024-12-13","o":24498.35,"h":24792.3,"l":24180.8,"c":24768.3,"v":310080852},{"date":"2024-12-16","o":24753.4,"h":24781.25,"l":24601.75,"c":24668.25,"v":187551629},{"date":"2024-12-17","o":24584.8,"h":24624.1,"l":24303.45,"c":24336,"v":264881033},{"date":"2024-12-18","o":24297.95,"h":24394.45,"l":24149.85,"c":24198.85,"v":235346534},{"date":"2024-12-19","o":23877.15,"h":24004.9,"l":23870.3,"c":23951.7,"v":271128027},{"date":"2024-12-20","o":23960.7,"h":24065.8,"l":23537.35,"c":23587.5,"v":442714411},{"date":"2024-12-23","o":23738.2,"h":23869.55,"l":23647.2,"c":23753.45,"v":189758237},{"date":"2024-12-24","o":23769.1,"h":23867.65,"l":23685.15,"c":23727.65,"v":177664746},{"date":"2024-12-26","o":23775.8,"h":23854.5,"l":23653.6,"c":23750.2,"v":177681783},{"date":"2024-12-27","o":23801.4,"h":23938.85,"l":23800.6,"c":23813.4,"v":176821521},{"date":"2024-12-30","o":23796.9,"h":23915.35,"l":23599.3,"c":23644.9,"v":364929453},{"date":"2024-12-31","o":23560.6,"h":23689.85,"l":23460.45,"c":23644.8,"v":193627727},{"date":"2025-01-01","o":23637.65,"h":23822.8,"l":23562.8,"c":23742.9,"v":154921938},{"date":"2025-01-02","o":23783,"h":24226.7,"l":23751.55,"c":24188.65,"v":283200811},{"date":"2025-01-03","o":24196.4,"h":24196.45,"l":23976,"c":24004.75,"v":312279515},{"date":"2025-01-06","o":24045.8,"h":24089.95,"l":23551.9,"c":23616.05,"v":278061806},{"date":"2025-01-07","o":23679.9,"h":23795.2,"l":23637.8,"c":23707.9,"v":262337253},{"date":"2025-01-08","o":23746.65,"h":23751.85,"l":23496.15,"c":23688.95,"v":266375381},{"date":"2025-01-09","o":23674.75,"h":23689.5,"l":23503.05,"c":23526.5,"v":269239831},{"date":"2025-01-10","o":23551.9,"h":23596.6,"l":23344.35,"c":23431.5,"v":261022434},{"date":"2025-01-13","o":23195.4,"h":23340.95,"l":23047.25,"c":23085.95,"v":316481107},{"date":"2025-01-14","o":23165.9,"h":23264.95,"l":23134.15,"c":23176.05,"v":311235510},{"date":"2025-01-15","o":23250.45,"h":23293.65,"l":23146.45,"c":23213.2,"v":228039156},{"date":"2025-01-16","o":23377.25,"h":23391.65,"l":23272.05,"c":23311.8,"v":299416081},{"date":"2025-01-17","o":23277.1,"h":23292.1,"l":23100.35,"c":23203.2,"v":272945267},{"date":"2025-01-20","o":23290.4,"h":23391.1,"l":23170.65,"c":23344.75,"v":301455455},{"date":"2025-01-21","o":23421.65,"h":23426.3,"l":22976.85,"c":23024.65,"v":312871897},{"date":"2025-01-22","o":23099.15,"h":23169.55,"l":22981.3,"c":23155.35,"v":275951918},{"date":"2025-01-23","o":23128.3,"h":23270.8,"l":23090.65,"c":23205.35,"v":275558357},{"date":"2025-01-24","o":23183.9,"h":23347.3,"l":23050,"c":23092.2,"v":264336332},{"date":"2025-01-27","o":22940.15,"h":23007.45,"l":22786.9,"c":22829.15,"v":257372790},{"date":"2025-01-28","o":22960.45,"h":23137.95,"l":22857.65,"c":22957.25,"v":361868609},{"date":"2025-01-29","o":23026.75,"h":23183.35,"l":22976.5,"c":23163.1,"v":251208119},{"date":"2025-01-30","o":23169.5,"h":23322.05,"l":23139.2,"c":23249.5,"v":384687127},{"date":"2025-01-31","o":23296.75,"h":23546.8,"l":23277.4,"c":23508.4,"v":326919177},{"date":"2025-02-03","o":23319.35,"h":23381.6,"l":23222,"c":23361.05,"v":347241171},{"date":"2025-02-04","o":23509.9,"h":23762.75,"l":23423.15,"c":23739.25,"v":376742506},{"date":"2025-02-05","o":23801.75,"h":23807.3,"l":23680.45,"c":23696.3,"v":267014345},{"date":"2025-02-06","o":23761.95,"h":23773.55,"l":23556.25,"c":23603.35,"v":306978683},{"date":"2025-02-07","o":23649.5,"h":23694.5,"l":23443.2,"c":23559.95,"v":368092482},{"date":"2025-02-10","o":23543.8,"h":23568.6,"l":23316.3,"c":23381.6,"v":225529166},{"date":"2025-02-11","o":23383.55,"h":23390.05,"l":22986.65,"c":23071.8,"v":267969979},{"date":"2025-02-12","o":23050.8,"h":23144.7,"l":22798.35,"c":23045.25,"v":279656513},{"date":"2025-02-13","o":23055.75,"h":23235.5,"l":22992.2,"c":23031.4,"v":265706855},{"date":"2025-02-14","o":23096.45,"h":23133.7,"l":22774.85,"c":22929.25,"v":254479643},{"date":"2025-02-17","o":22809.9,"h":22974.2,"l":22725.45,"c":22959.5,"v":207393944},{"date":"2025-02-18","o":22963.65,"h":22992.5,"l":22801.5,"c":22945.3,"v":210616675},{"date":"2025-02-19","o":22847.25,"h":23049.95,"l":22814.85,"c":22932.9,"v":206999204},{"date":"2025-02-20","o":22821.1,"h":22923.85,"l":22812.75,"c":22913.15,"v":240836647},{"date":"2025-02-21","o":22857.2,"h":22921,"l":22720.3,"c":22795.9,"v":242753984},{"date":"2025-02-24","o":22609.35,"h":22668.05,"l":22518.8,"c":22553.35,"v":214317552},{"date":"2025-02-25","o":22516.45,"h":22625.3,"l":22513.9,"c":22547.55,"v":250279519},{"date":"2025-02-27","o":22568.95,"h":22613.3,"l":22508.4,"c":22545.05,"v":289230479},{"date":"2025-02-28","o":22433.4,"h":22450.35,"l":22104.85,"c":22124.7,"v":551285287},{"date":"2025-03-03","o":22194.55,"h":22261.55,"l":22004.7,"c":22119.3,"v":282399735},{"date":"2025-03-04","o":21974.45,"h":22105.05,"l":21964.6,"c":22082.65,"v":253260641},{"date":"2025-03-05","o":22073.05,"h":22394.9,"l":22067.8,"c":22337.3,"v":305942691},{"date":"2025-03-06","o":22476.35,"h":22556.45,"l":22245.85,"c":22544.7,"v":372083680},{"date":"2025-03-07","o":22508.65,"h":22633.8,"l":22464.75,"c":22552.5,"v":289765795},{"date":"2025-03-10","o":22521.85,"h":22676.75,"l":22429.05,"c":22460.3,"v":293855491},{"date":"2025-03-11","o":22345.95,"h":22522.1,"l":22314.7,"c":22497.9,"v":347924102},{"date":"2025-03-12","o":22536.35,"h":22577.4,"l":22329.55,"c":22470.5,"v":369736725},{"date":"2025-03-13","o":22541.5,"h":22558.05,"l":22377.35,"c":22397.2,"v":287535243},{"date":"2025-03-17","o":22353.15,"h":22577,"l":22353.15,"c":22508.75,"v":251102239},{"date":"2025-03-18","o":22662.25,"h":22857.8,"l":22599.2,"c":22834.3,"v":272578844},{"date":"2025-03-19","o":22874.95,"h":22940.7,"l":22807.95,"c":22907.6,"v":323992121},{"date":"2025-03-20","o":23036.6,"h":23216.7,"l":22973.95,"c":23190.65,"v":313729818},{"date":"2025-03-21","o":23168.25,"h":23402.7,"l":23132.8,"c":23350.4,"v":540966316},{"date":"2025-03-24","o":23515.4,"h":23708.75,"l":23433.5,"c":23658.35,"v":311900413},{"date":"2025-03-25","o":23751.5,"h":23869.6,"l":23601.4,"c":23668.65,"v":338216746},{"date":"2025-03-26","o":23700.95,"h":23736.5,"l":23451.7,"c":23486.85,"v":278590831},{"date":"2025-03-27","o":23433.95,"h":23646.45,"l":23412.2,"c":23591.95,"v":510302142},{"date":"2025-03-28","o":23600.4,"h":23649.2,"l":23450.2,"c":23519.35,"v":387455531},{"date":"2025-04-01","o":23341.1,"h":23565.15,"l":23136.4,"c":23165.7,"v":375118343},{"date":"2025-04-02","o":23192.6,"h":23350,"l":23158.45,"c":23332.35,"v":340970371},{"date":"2025-04-03","o":23150.3,"h":23306.5,"l":23145.8,"c":23250.1,"v":283196379},{"date":"2025-04-04","o":23190.4,"h":23214.7,"l":22857.45,"c":22904.45,"v":466776198},{"date":"2025-04-07","o":21758.4,"h":22254,"l":21743.65,"c":22161.6,"v":647107618},{"date":"2025-04-08","o":22446.75,"h":22697.2,"l":22270.85,"c":22535.85,"v":468250807},{"date":"2025-04-09","o":22460.3,"h":22468.7,"l":22353.25,"c":22399.15,"v":383822618},{"date":"2025-04-11","o":22695.4,"h":22923.9,"l":22695.4,"c":22828.55,"v":402162001},{"date":"2025-04-15","o":23368.35,"h":23368.35,"l":23207,"c":23328.55,"v":388321931},{"date":"2025-04-16","o":23344.1,"h":23452.2,"l":23273.05,"c":23437.2,"v":348424960},{"date":"2025-04-17","o":23401.85,"h":23872.35,"l":23298.55,"c":23851.65,"v":505333905},{"date":"2025-04-21","o":23949.15,"h":24189.55,"l":23903.65,"c":24125.55,"v":406145632},{"date":"2025-04-22","o":24185.4,"h":24242.6,"l":24072,"c":24167.25,"v":440940490},{"date":"2025-04-23","o":24357.6,"h":24359.3,"l":24119.95,"c":24328.95,"v":415042544},{"date":"2025-04-24","o":24277.9,"h":24347.85,"l":24216.15,"c":24246.7,"v":358768165},{"date":"2025-04-25","o":24289,"h":24365.45,"l":23847.85,"c":24039.35,"v":387741866},{"date":"2025-04-28","o":24070.25,"h":24355.1,"l":24054.05,"c":24328.5,"v":320467976},{"date":"2025-04-29","o":24370.7,"h":24457.65,"l":24290.75,"c":24335.95,"v":357563224},{"date":"2025-04-30","o":24342.05,"h":24396.15,"l":24198.75,"c":24334.2,"v":424452559},{"date":"2025-05-02","o":24311.9,"h":24589.15,"l":24238.5,"c":24346.7,"v":421112627},{"date":"2025-05-05","o":24419.5,"h":24526.4,"l":24400.65,"c":24461.15,"v":291471628},{"date":"2025-05-06","o":24500.75,"h":24509.65,"l":24331.8,"c":24379.6,"v":302354059},{"date":"2025-05-07","o":24233.3,"h":24449.6,"l":24220,"c":24414.4,"v":330137191},{"date":"2025-05-08","o":24431.5,"h":24447.25,"l":24150.2,"c":24273.8,"v":411362230},{"date":"2025-05-09","o":23935.75,"h":24164.25,"l":23935.75,"c":24008,"v":335550680},{"date":"2025-05-12","o":24420.1,"h":24944.8,"l":24378.85,"c":24924.7,"v":368707684},{"date":"2025-05-13","o":24864.05,"h":24973.8,"l":24547.5,"c":24578.35,"v":422977876},{"date":"2025-05-14","o":24613.8,"h":24767.55,"l":24535.55,"c":24666.9,"v":345490805},{"date":"2025-05-15","o":24694.45,"h":25116.25,"l":24494.45,"c":25062.1,"v":500821889},{"date":"2025-05-16","o":25064.65,"h":25070,"l":24953.05,"c":25019.8,"v":432717092},{"date":"2025-05-19","o":25005.35,"h":25062.95,"l":24916.65,"c":24945.45,"v":255254340},{"date":"2025-05-20","o":24996.2,"h":25010.35,"l":24669.7,"c":24683.9,"v":414799113},{"date":"2025-05-21","o":24744.25,"h":24946.2,"l":24685.35,"c":24813.45,"v":332724952},{"date":"2025-05-22","o":24733.95,"h":24737.5,"l":24462.4,"c":24609.7,"v":403279638},{"date":"2025-05-23","o":24639.5,"h":24909.05,"l":24614.05,"c":24853.15,"v":270470348},{"date":"2025-05-26","o":24919.35,"h":25079.2,"l":24900.5,"c":25001.15,"v":302799227},{"date":"2025-05-27","o":24956.65,"h":25062.9,"l":24704.1,"c":24826.2,"v":525653668},{"date":"2025-05-28","o":24832.5,"h":24864.25,"l":24737.05,"c":24752.45,"v":684425321},{"date":"2025-05-29","o":24825.1,"h":24892.6,"l":24677.3,"c":24833.6,"v":345370611},{"date":"2025-05-30","o":24812.6,"h":24863.95,"l":24717.4,"c":24750.7,"v":853890978},{"date":"2025-06-02","o":24669.7,"h":24754.4,"l":24526.15,"c":24716.6,"v":311100908},{"date":"2025-06-03","o":24786.3,"h":24845.1,"l":24502.15,"c":24542.5,"v":349288937},{"date":"2025-06-04","o":24560.45,"h":24644.25,"l":24530.45,"c":24620.2,"v":280862575},{"date":"2025-06-05","o":24691.2,"h":24899.85,"l":24613.1,"c":24750.9,"v":388405978},{"date":"2025-06-06","o":24748.7,"h":25029.5,"l":24671.45,"c":25003.05,"v":335581057},{"date":"2025-06-09","o":25160.1,"h":25160.1,"l":25077.15,"c":25103.2,"v":279219989},{"date":"2025-06-10","o":25196.05,"h":25199.3,"l":25055.45,"c":25104.25,"v":307323471},{"date":"2025-06-11","o":25134.15,"h":25222.4,"l":25081.3,"c":25141.4,"v":301245273},{"date":"2025-06-12","o":25164.45,"h":25196.2,"l":24825.9,"c":24888.2,"v":328310748},{"date":"2025-06-13","o":24473,"h":24754.35,"l":24473,"c":24718.6,"v":318711364},{"date":"2025-06-16","o":24732.35,"h":24967.1,"l":24703.6,"c":24946.5,"v":305813047},{"date":"2025-06-17","o":24977.85,"h":24982.05,"l":24813.7,"c":24853.4,"v":242415740},{"date":"2025-06-18","o":24788.35,"h":24947.55,"l":24750.45,"c":24812.05,"v":237599011},{"date":"2025-06-19","o":24803.25,"h":24863.1,"l":24733.4,"c":24793.25,"v":274619935},{"date":"2025-06-20","o":24787.65,"h":25136.2,"l":24783.65,"c":25112.4,"v":574654035},{"date":"2025-06-23","o":24939.75,"h":25057,"l":24824.85,"c":24971.9,"v":248534153},{"date":"2025-06-24","o":25179.9,"h":25317.7,"l":24999.7,"c":25044.35,"v":450185468},{"date":"2025-06-25","o":25150.35,"h":25266.8,"l":25125.05,"c":25244.75,"v":260582584},{"date":"2025-06-26","o":25268.95,"h":25565.3,"l":25259.9,"c":25549,"v":428891818},{"date":"2025-06-27","o":25576.65,"h":25654.2,"l":25523.55,"c":25637.8,"v":563957748},{"date":"2025-06-30","o":25661.65,"h":25669.35,"l":25473.3,"c":25517.05,"v":270981274},{"date":"2025-07-01","o":25551.35,"h":25593.4,"l":25501.8,"c":25541.8,"v":260669106},{"date":"2025-07-02","o":25588.3,"h":25608.1,"l":25378.75,"c":25453.4,"v":309828013},{"date":"2025-07-03","o":25505.1,"h":25587.5,"l":25384.35,"c":25405.3,"v":293428797},{"date":"2025-07-04","o":25428.85,"h":25470.25,"l":25331.65,"c":25461,"v":193511595},{"date":"2025-07-07","o":25450.45,"h":25489.8,"l":25407.25,"c":25461.3,"v":196051345},{"date":"2025-07-08","o":25427.85,"h":25548.05,"l":25424.15,"c":25522.5,"v":210410530},{"date":"2025-07-09","o":25514.6,"h":25548.7,"l":25424.35,"c":25476.1,"v":239081546},{"date":"2025-07-10","o":25511.65,"h":25524.05,"l":25340.45,"c":25355.25,"v":219609322},{"date":"2025-07-11","o":25255.5,"h":25322.45,"l":25129,"c":25149.85,"v":249987681},{"date":"2025-07-14","o":25149.5,"h":25151.1,"l":25001.95,"c":25082.3,"v":259533624},{"date":"2025-07-15","o":25089.5,"h":25245.2,"l":25088.45,"c":25195.8,"v":241340130},{"date":"2025-07-16","o":25196.6,"h":25255.3,"l":25121.05,"c":25212.05,"v":228815928},{"date":"2025-07-17","o":25230.75,"h":25238.35,"l":25101,"c":25111.45,"v":243412540},{"date":"2025-07-18","o":25108.55,"h":25144.6,"l":24918.65,"c":24968.4,"v":316979826},{"date":"2025-07-21","o":24999,"h":25111.4,"l":24882.3,"c":25090.7,"v":305216414},{"date":"2025-07-22","o":25166.65,"h":25182,"l":25035.55,"c":25060.9,"v":483725120},{"date":"2025-07-23","o":25139.35,"h":25233.5,"l":25085.5,"c":25219.9,"v":271539651},{"date":"2025-07-24","o":25243.3,"h":25246.25,"l":25018.7,"c":25062.1,"v":338728860},{"date":"2025-07-25","o":25010.35,"h":25010.35,"l":24806.35,"c":24837,"v":278136104},{"date":"2025-07-28","o":24782.45,"h":24889.2,"l":24646.6,"c":24680.9,"v":262142969},{"date":"2025-07-29","o":24609.65,"h":24847.15,"l":24598.6,"c":24821.1,"v":284657235},{"date":"2025-07-30","o":24890.4,"h":24902.3,"l":24771.95,"c":24855.05,"v":243886726},{"date":"2025-07-31","o":24642.25,"h":24956.5,"l":24635,"c":24768.35,"v":346303628},{"date":"2025-08-01","o":24734.9,"h":24784.15,"l":24535.05,"c":24565.35,"v":263357194},{"date":"2025-08-04","o":24596.05,"h":24736.25,"l":24554,"c":24722.75,"v":259329477},{"date":"2025-08-05","o":24720.25,"h":24733.1,"l":24590.3,"c":24649.55,"v":251849778},{"date":"2025-08-06","o":24641.35,"h":24671.4,"l":24539.2,"c":24574.2,"v":225091071},{"date":"2025-08-07","o":24464.2,"h":24634.2,"l":24344.15,"c":24596.15,"v":616739190},{"date":"2025-08-08","o":24544.25,"h":24585.5,"l":24337.5,"c":24363.3,"v":312630157},{"date":"2025-08-11","o":24371.5,"h":24600.85,"l":24347.45,"c":24585.05,"v":241145497},{"date":"2025-08-12","o":24563.35,"h":24702.6,"l":24465.65,"c":24487.4,"v":237002462},{"date":"2025-08-13","o":24586.2,"h":24664.55,"l":24535.25,"c":24619.35,"v":236006791},{"date":"2025-08-14","o":24607.25,"h":24673.65,"l":24596.9,"c":24631.3,"v":270162203},{"date":"2025-08-18","o":24938.2,"h":25022,"l":24852.85,"c":24876.95,"v":363071305},{"date":"2025-08-19","o":24891.35,"h":25012.65,"l":24873.95,"c":24980.65,"v":252340828},{"date":"2025-08-20","o":24965.8,"h":25088.7,"l":24929.7,"c":25050.55,"v":287054119},{"date":"2025-08-21","o":25142,"h":25153.65,"l":25054.9,"c":25083.75,"v":226542052},{"date":"2025-08-22","o":25064.15,"h":25084.85,"l":24859.15,"c":24870.1,"v":210165384},{"date":"2025-08-25","o":24949.15,"h":25021.55,"l":24894.35,"c":24967.75,"v":213032133},{"date":"2025-08-26","o":24899.5,"h":24919.65,"l":24689.6,"c":24712.05,"v":750473927},{"date":"2025-08-28","o":24695.8,"h":24702.65,"l":24481.6,"c":24500.9,"v":326601486},{"date":"2025-08-29","o":24466.7,"h":24572.45,"l":24404.7,"c":24426.85,"v":325543583},{"date":"2025-09-01","o":24432.7,"h":24635.6,"l":24432.7,"c":24625.05,"v":229327424},{"date":"2025-09-02","o":24653,"h":24756.1,"l":24522.35,"c":24579.6,"v":271558516},{"date":"2025-09-03","o":24616.5,"h":24737.05,"l":24533.2,"c":24715.05,"v":340283328},{"date":"2025-09-04","o":24980.75,"h":24980.75,"l":24708.2,"c":24734.3,"v":314094160},{"date":"2025-09-05","o":24818.85,"h":24832.35,"l":24621.6,"c":24741,"v":210071924},{"date":"2025-09-08","o":24802.6,"h":24885.5,"l":24751.55,"c":24773.15,"v":213228202},{"date":"2025-09-09","o":24864.1,"h":24891.8,"l":24814,"c":24868.6,"v":226919775},{"date":"2025-09-10","o":24991,"h":25035.7,"l":24915.05,"c":24973.1,"v":244146466},{"date":"2025-09-11","o":24945.5,"h":25037.3,"l":24940.15,"c":25005.5,"v":224570983},{"date":"2025-09-12","o":25074.45,"h":25139.45,"l":25038.05,"c":25114,"v":225739766},{"date":"2025-09-15","o":25118.9,"h":25138.45,"l":25048.75,"c":25069.2,"v":185375759},{"date":"2025-09-16","o":25073.6,"h":25261.4,"l":25070.45,"c":25239.1,"v":240122320},{"date":"2025-09-17","o":25276.6,"h":25346.5,"l":25275.35,"c":25330.25,"v":268936695},{"date":"2025-09-18","o":25441.05,"h":25448.95,"l":25329.75,"c":25423.6,"v":272193683},{"date":"2025-09-19","o":25410.2,"h":25431.4,"l":25286.3,"c":25327.05,"v":380362832},{"date":"2025-09-22","o":25238.1,"h":25331.7,"l":25151.05,"c":25202.35,"v":254509892},{"date":"2025-09-23","o":25209,"h":25261.9,"l":25084.65,"c":25169.5,"v":299204338},{"date":"2025-09-24","o":25108.75,"h":25149.85,"l":25027.45,"c":25056.9,"v":244382281},{"date":"2025-09-25","o":25034.5,"h":25092.7,"l":24878.3,"c":24890.85,"v":342534768},{"date":"2025-09-26","o":24818.55,"h":24868.6,"l":24629.45,"c":24654.7,"v":291537949},{"date":"2025-09-29","o":24728.55,"h":24791.3,"l":24606.2,"c":24634.9,"v":394388242},{"date":"2025-09-30","o":24691.95,"h":24731.8,"l":24587.7,"c":24611.1,"v":304924720},{"date":"2025-10-01","o":24620.55,"h":24867.95,"l":24605.95,"c":24836.3,"v":308135228},{"date":"2025-10-03","o":24759.55,"h":24904.8,"l":24747.55,"c":24894.25,"v":366929642},{"date":"2025-10-06","o":24916.55,"h":25095.95,"l":24881.65,"c":25077.65,"v":271953070},{"date":"2025-10-07","o":25085.3,"h":25220.9,"l":25076.3,"c":25108.3,"v":286833765},{"date":"2025-10-08","o":25079.75,"h":25192.5,"l":25008.5,"c":25046.15,"v":225967495},{"date":"2025-10-09","o":25074.3,"h":25199.25,"l":25024.3,"c":25181.8,"v":286253252},{"date":"2025-10-10","o":25167.65,"h":25330.75,"l":25156.85,"c":25285.35,"v":232943306},{"date":"2025-10-13","o":25177.3,"h":25267.3,"l":25152.3,"c":25227.35,"v":234285202},{"date":"2025-10-14","o":25277.55,"h":25310.35,"l":25060.55,"c":25145.5,"v":292129083},{"date":"2025-10-15","o":25181.95,"h":25365.15,"l":25159.35,"c":25323.55,"v":289930172},{"date":"2025-10-16","o":25394.9,"h":25625.4,"l":25376.85,"c":25585.3,"v":372777021},{"date":"2025-10-17","o":25546.85,"h":25781.5,"l":25508.6,"c":25709.85,"v":422055809},{"date":"2025-10-20","o":25824.6,"h":25926.2,"l":25788.5,"c":25843.15,"v":301133193},{"date":"2025-10-21","o":25901.2,"h":25934.35,"l":25825.8,"c":25868.6,"v":42477128},{"date":"2025-10-23","o":26057.2,"h":26104.2,"l":25862.45,"c":25891.4,"v":448404894},{"date":"2025-10-24","o":25935.1,"h":25944.15,"l":25718.2,"c":25795.15,"v":284913477},{"date":"2025-10-27","o":25843.2,"h":26005.95,"l":25827,"c":25966.05,"v":266337274},{"date":"2025-10-28","o":25939.95,"h":26041.7,"l":25810.05,"c":25936.2,"v":395231207},{"date":"2025-10-29","o":25982,"h":26097.85,"l":25960.3,"c":26053.9,"v":321880610},{"date":"2025-10-30","o":25984.4,"h":26032.05,"l":25845.25,"c":25877.85,"v":257373001},{"date":"2025-10-31","o":25863.8,"h":25953.75,"l":25711.2,"c":25722.1,"v":334384400},{"date":"2025-11-03","o":25696.85,"h":25803.1,"l":25645.5,"c":25763.35,"v":275858501},{"date":"2025-11-04","o":25744.75,"h":25787.4,"l":25578.4,"c":25597.65,"v":305143084},{"date":"2025-11-06","o":25593.35,"h":25679.15,"l":25491.55,"c":25509.7,"v":371852417},{"date":"2025-11-07","o":25433.8,"h":25551.25,"l":25318.45,"c":25492.3,"v":305606393},{"date":"2025-11-10","o":25503.5,"h":25653.45,"l":25503.5,"c":25574.35,"v":243592948},{"date":"2025-11-11","o":25617,"h":25715.8,"l":25449.25,"c":25694.95,"v":297714069},{"date":"2025-11-12","o":25834.3,"h":25934.55,"l":25781.15,"c":25875.8,"v":343864299},{"date":"2025-11-13","o":25906.1,"h":26010.7,"l":25808.4,"c":25879.15,"v":385170023},{"date":"2025-11-14","o":25767.9,"h":25940.2,"l":25740.8,"c":25910.05,"v":518943416},{"date":"2025-11-17","o":25948.2,"h":26024.2,"l":25906.35,"c":26013.45,"v":264610565},{"date":"2025-11-18","o":26021.8,"h":26029.85,"l":25876.5,"c":25910.05,"v":280000989},{"date":"2025-11-19","o":25918.1,"h":26074.65,"l":25856.2,"c":26052.65,"v":250110008},{"date":"2025-11-20","o":26132.1,"h":26246.65,"l":26063.2,"c":26192.15,"v":240425729},{"date":"2025-11-21","o":26109.55,"h":26179.2,"l":26052.2,"c":26068.15,"v":235581427},{"date":"2025-11-24","o":26122.8,"h":26142.8,"l":25912.15,"c":25959.5,"v":464655063},{"date":"2025-11-25","o":25998.5,"h":26032.6,"l":25857.5,"c":25884.8,"v":260454909},{"date":"2025-11-26","o":25842.95,"h":26215.15,"l":25842.95,"c":26205.3,"v":275265169},{"date":"2025-11-27","o":26261.25,"h":26310.45,"l":26141.9,"c":26215.55,"v":240287057},{"date":"2025-11-28","o":26237.45,"h":26280.75,"l":26172.4,"c":26202.95,"v":202511545},{"date":"2025-12-01","o":26325.8,"h":26325.8,"l":26124.2,"c":26175.75,"v":213828573},{"date":"2025-12-02","o":26087.95,"h":26154.6,"l":25997.85,"c":26032.2,"v":254803113},{"date":"2025-12-03","o":26004.9,"h":26066.45,"l":25891,"c":25986,"v":265660108},{"date":"2025-12-04","o":25981.85,"h":26098.25,"l":25938.95,"c":26033.75,"v":248099545},{"date":"2025-12-05","o":25999.8,"h":26202.6,"l":25985.35,"c":26186.45,"v":249254405},{"date":"2025-12-08","o":26159.8,"h":26178.7,"l":25892.25,"c":25960.55,"v":320729920},{"date":"2025-12-09","o":25867.1,"h":25923.65,"l":25728,"c":25839.65,"v":275978160},{"date":"2025-12-10","o":25864.05,"h":25947.65,"l":25734.55,"c":25758,"v":207944446},{"date":"2025-12-11","o":25771.4,"h":25922.8,"l":25693.25,"c":25898.55,"v":206099631},{"date":"2025-12-12","o":25971.2,"h":26057.6,"l":25938.45,"c":26046.95,"v":216344338},{"date":"2025-12-15","o":25930.05,"h":26047.15,"l":25904.75,"c":26027.3,"v":181557703},{"date":"2025-12-16","o":25951.5,"h":25980.75,"l":25834.35,"c":25860.1,"v":264351195},{"date":"2025-12-17","o":25902.4,"h":25929.15,"l":25770.35,"c":25818.55,"v":206521258},{"date":"2025-12-18","o":25764.7,"h":25902.35,"l":25726.3,"c":25815.55,"v":197553755},{"date":"2025-12-19","o":25911.5,"h":25993.35,"l":25880.45,"c":25966.4,"v":382927284},{"date":"2025-12-22","o":26055.85,"h":26180.7,"l":26047.8,"c":26172.4,"v":252990050},{"date":"2025-12-23","o":26205.2,"h":26233.55,"l":26119.05,"c":26177.15,"v":216553840},{"date":"2025-12-24","o":26170.65,"h":26236.4,"l":26123,"c":26142.1,"v":188846828},{"date":"2025-12-26","o":26121.25,"h":26144.2,"l":26008.6,"c":26042.3,"v":142243763},{"date":"2025-12-29","o":26063.35,"h":26106.8,"l":25920.3,"c":25942.1,"v":234312888},{"date":"2025-12-30","o":25940.9,"h":25976.75,"l":25878,"c":25938.85,"v":396893959},{"date":"2025-12-31","o":25971.05,"h":26187.95,"l":25969,"c":26129.6,"v":246314941},{"date":"2026-01-01","o":26173.3,"h":26197.55,"l":26113.4,"c":26146.55,"v":425631910},{"date":"2026-01-02","o":26155.1,"h":26340,"l":26118.4,"c":26328.55,"v":357547806},{"date":"2026-01-05","o":26333.7,"h":26373.2,"l":26210.05,"c":26250.3,"v":338777649},{"date":"2026-01-06","o":26189.7,"h":26273.95,"l":26124.75,"c":26178.7,"v":383040203},{"date":"2026-01-07","o":26143.1,"h":26187.15,"l":26067.9,"c":26140.75,"v":338216740},{"date":"2026-01-08","o":26106.5,"h":26133.2,"l":25858.45,"c":25876.85,"v":328520950},{"date":"2026-01-09","o":25840.4,"h":25940.6,"l":25623,"c":25683.3,"v":348757262},{"date":"2026-01-12","o":25669.05,"h":25813.15,"l":25473.4,"c":25790.25,"v":275757268},{"date":"2026-01-13","o":25897.35,"h":25899.8,"l":25603.3,"c":25732.3,"v":339536336},{"date":"2026-01-14","o":25648.55,"h":25791.75,"l":25603.95,"c":25665.6,"v":393126596},{"date":"2026-01-16","o":25696.05,"h":25873.5,"l":25662.4,"c":25694.35,"v":434041776},{"date":"2026-01-19","o":25653.1,"h":25653.3,"l":25494.35,"c":25585.5,"v":443087953},{"date":"2026-01-20","o":25580.3,"h":25585,"l":25171.35,"c":25232.5,"v":409772324},{"date":"2026-01-21","o":25141,"h":25300.95,"l":24919.8,"c":25157.5,"v":395624981},{"date":"2026-01-22","o":25344.15,"h":25435.75,"l":25168.5,"c":25289.9,"v":486395433},{"date":"2026-01-23","o":25344.6,"h":25347.95,"l":25025.3,"c":25048.65,"v":393944908},{"date":"2026-01-27","o":25063.35,"h":25246.65,"l":24932.55,"c":25175.4,"v":618696080},{"date":"2026-01-28","o":25258.85,"h":25372.1,"l":25187.65,"c":25342.75,"v":574903942},{"date":"2026-01-29","o":25345,"h":25458.15,"l":25159.8,"c":25418.9,"v":582389331},{"date":"2026-01-30","o":25247.55,"h":25370.7,"l":25213.65,"c":25320.65,"v":508388604},{"date":"2026-02-02","o":24796.5,"h":25108.1,"l":24679.4,"c":25088.4,"v":449215604},{"date":"2026-02-03","o":26308.05,"h":26341.2,"l":25641.3,"c":25727.55,"v":637263148},{"date":"2026-02-04","o":25675.05,"h":25818.55,"l":25563.95,"c":25776,"v":429788986},{"date":"2026-02-05","o":25755.9,"h":25757.65,"l":25579.5,"c":25642.8,"v":343812628},{"date":"2026-02-06","o":25605.8,"h":25703.95,"l":25491.9,"c":25693.7,"v":375476124},{"date":"2026-02-09","o":25888.7,"h":25922.25,"l":25780.9,"c":25867.3,"v":359386006},{"date":"2026-02-10","o":25922.65,"h":25989.45,"l":25870.45,"c":25935.15,"v":460878237},{"date":"2026-02-11","o":25997.45,"h":26009.4,"l":25899.8,"c":25953.85,"v":331389240},{"date":"2026-02-12","o":25906.7,"h":25906.7,"l":25752.4,"c":25807.2,"v":419388014},{"date":"2026-02-13","o":25571.15,"h":25630.35,"l":25444.3,"c":25471.1,"v":453523192},{"date":"2026-02-16","o":25423.6,"h":25697,"l":25372.7,"c":25682.75,"v":325487729},{"date":"2026-02-17","o":25637.95,"h":25764.4,"l":25570.3,"c":25725.4,"v":378436265},{"date":"2026-02-18","o":25752.65,"h":25828.05,"l":25645.15,"c":25819.35,"v":400807585},{"date":"2026-02-19","o":25873.35,"h":25885.3,"l":25388.75,"c":25454.35,"v":333658812},{"date":"2026-02-20","o":25406.55,"h":25663.55,"l":25379.75,"c":25571.25,"v":309373691},{"date":"2026-02-23","o":25678.4,"h":25771.45,"l":25609.35,"c":25713,"v":399135843},{"date":"2026-02-24","o":25641.8,"h":25641.8,"l":25327.6,"c":25424.65,"v":439068188},{"date":"2026-02-25","o":25512.6,"h":25652.6,"l":25428.2,"c":25482.5,"v":414215742},{"date":"2026-02-26","o":25556.3,"h":25572.95,"l":25400.95,"c":25496.55,"v":405219244},{"date":"2026-02-27","o":25459.85,"h":25476.4,"l":25141.3,"c":25178.65,"v":438924282},{"date":"2026-03-02","o":24659.25,"h":24989.35,"l":24603.5,"c":24865.7,"v":519228821},{"date":"2026-03-04","o":24388.8,"h":24602.45,"l":24305.4,"c":24480.5,"v":598993881},{"date":"2026-03-05","o":24615.95,"h":24854.2,"l":24529.4,"c":24765.9,"v":504339053},{"date":"2026-03-06","o":24656.4,"h":24700.8,"l":24415.75,"c":24450.45,"v":433408256},{"date":"2026-03-09","o":23868.05,"h":24078.15,"l":23697.8,"c":24028.05,"v":526901605},{"date":"2026-03-10","o":24280.8,"h":24303.8,"l":24079.95,"c":24261.6,"v":444283436},{"date":"2026-03-11","o":24231.85,"h":24299,"l":23834.3,"c":23866.85,"v":407400643},{"date":"2026-03-12","o":23674.85,"h":23833.15,"l":23556.3,"c":23639.15,"v":501004098},{"date":"2026-03-13","o":23462.5,"h":23492.4,"l":23112,"c":23151.1,"v":519776752},{"date":"2026-03-16","o":23116.1,"h":23502,"l":22955.25,"c":23408.8,"v":540293230},{"date":"2026-03-17","o":23493.2,"h":23656.8,"l":23346.6,"c":23581.15,"v":458788167},{"date":"2026-03-18","o":23632.9,"h":23862.25,"l":23618.45,"c":23777.8,"v":382876401},{"date":"2026-03-19","o":23197.75,"h":23378.7,"l":22930.35,"c":23002.15,"v":550147401},{"date":"2026-03-20","o":23110.15,"h":23345.15,"l":23067.6,"c":23114.5,"v":663289390},{"date":"2026-03-23","o":22824.35,"h":22851.7,"l":22471.25,"c":22512.65,"v":550275334},{"date":"2026-03-24","o":22878.45,"h":23057.3,"l":22624.2,"c":22912.4,"v":538098322},{"date":"2026-03-25","o":23064.4,"h":23465.35,"l":23063.2,"c":23306.45,"v":505418973},{"date":"2026-03-27","o":23173.55,"h":23186.1,"l":22804.55,"c":22819.6,"v":612556883},{"date":"2026-03-30","o":22549.65,"h":22714.1,"l":22283.85,"c":22331.4,"v":698599891},{"date":"2026-04-01","o":22899,"h":22941.3,"l":22618.6,"c":22679.4,"v":517954448},{"date":"2026-04-02","o":22383.4,"h":22782.3,"l":22182.55,"c":22713.1,"v":495121035},{"date":"2026-04-06","o":22780.3,"h":22998.35,"l":22542.95,"c":22968.25,"v":426416812},{"date":"2026-04-07","o":22838.7,"h":23153.85,"l":22719.3,"c":23123.65,"v":476981883},{"date":"2026-04-08","o":23855.15,"h":24025.15,"l":23828.5,"c":23997.35,"v":639257993},{"date":"2026-04-09","o":23909.05,"h":23990.75,"l":23682.8,"c":23775.1,"v":466587329},{"date":"2026-04-10","o":23880.55,"h":24074.05,"l":23856.35,"c":24050.6,"v":481302436},{"date":"2026-04-13","o":23589.6,"h":23907.4,"l":23555.6,"c":23842.65,"v":488844789},{"date":"2026-04-15","o":24163.8,"h":24280.9,"l":24145.8,"c":24231.3,"v":460334041},{"date":"2026-04-16","o":24385.2,"h":24400.95,"l":24102.8,"c":24196.75,"v":508017772},{"date":"2026-04-17","o":24165.9,"h":24371.9,"l":24096.05,"c":24353.55,"v":498625189},{"date":"2026-04-20","o":24391.5,"h":24480.65,"l":24241.25,"c":24364.85,"v":415942883},{"date":"2026-04-21","o":24374.55,"h":24601.7,"l":24354.9,"c":24576.6,"v":425826834},{"date":"2026-04-22","o":24470.85,"h":24515.95,"l":24352.9,"c":24378.1,"v":440524292},{"date":"2026-04-23","o":24202.35,"h":24310.2,"l":24134.8,"c":24173.05,"v":467549860},{"date":"2026-04-24","o":24100.55,"h":24206,"l":23813.65,"c":23897.95,"v":438433486},{"date":"2026-04-27","o":23945.45,"h":24130.7,"l":23936.2,"c":24092.7,"v":430297937},{"date":"2026-04-28","o":24049.9,"h":24181.8,"l":23957.05,"c":23995.7,"v":554134344},{"date":"2026-04-29","o":24096.9,"h":24334.7,"l":24059.95,"c":24177.65,"v":531122966},{"date":"2026-04-30","o":23996.95,"h":24087.45,"l":23796.85,"c":23997.55,"v":505520648},{"date":"2026-05-04","o":24063.55,"h":24290.2,"l":24004.75,"c":24119.3,"v":419069793},{"date":"2026-05-05","o":24052.6,"h":24081.7,"l":23882.05,"c":24032.8,"v":363297728},{"date":"2026-05-06","o":24171,"h":24356.5,"l":23997.9,"c":24330.95,"v":429190144},{"date":"2026-05-07","o":24398.5,"h":24482.1,"l":24284,"c":24326.65,"v":440621691},{"date":"2026-05-08","o":24233.65,"h":24253.8,"l":24126.65,"c":24176.15,"v":335887188},{"date":"2026-05-11","o":23970.1,"h":23997.45,"l":23799.1,"c":23815.85,"v":390108343},{"date":"2026-05-12","o":23722.6,"h":23757.55,"l":23348.4,"c":23379.55,"v":447518189},{"date":"2026-05-13","o":23362.45,"h":23582.95,"l":23262.55,"c":23412.6,"v":415359044},{"date":"2026-05-14","o":23530.25,"h":23777.2,"l":23426.55,"c":23689.6,"v":428735424},{"date":"2026-05-15","o":23731.4,"h":23839.3,"l":23610.3,"c":23643.5,"v":408864566},{"date":"2026-05-18","o":23482.2,"h":23695.65,"l":23317.1,"c":23649.95,"v":391968426},{"date":"2026-05-19","o":23675.3,"h":23782.3,"l":23587.2,"c":23618,"v":441953184},{"date":"2026-05-20","o":23457.25,"h":23690.9,"l":23397.3,"c":23659,"v":344050591},{"date":"2026-05-21","o":23830.05,"h":23859.9,"l":23596.6,"c":23654.7,"v":348183907},{"date":"2026-05-22","o":23671.2,"h":23835.65,"l":23671,"c":23719.3,"v":336108649},{"date":"2026-05-25","o":23940.25,"h":24054.45,"l":23922.85,"c":24031.7,"v":351224048},{"date":"2026-05-26","o":24004.1,"h":24089.8,"l":23885.45,"c":23913.7,"v":387932940},{"date":"2026-05-27","o":23880.35,"h":23983.2,"l":23858.25,"c":23907.15,"v":531572650},{"date":"2026-05-29","o":23902.15,"h":24002.8,"l":23484.75,"c":23547.75,"v":1198023438},{"date":"2026-06-01","o":23654.5,"h":23733.7,"l":23357.95,"c":23382.6,"v":421691204},{"date":"2026-06-02","o":23229.15,"h":23556.95,"l":23229.15,"c":23483.55,"v":511852817},{"date":"2026-06-03","o":23415.95,"h":23459.65,"l":23151.5,"c":23405.6,"v":450089851},{"date":"2026-06-04","o":23282.45,"h":23465.3,"l":23247.3,"c":23416.55,"v":412505524},{"date":"2026-06-05","o":23478.95,"h":23516.35,"l":23282.65,"c":23366.7,"v":366208223},{"date":"2026-06-08","o":23080.7,"h":23267.3,"l":23070.15,"c":23123,"v":375730763},{"date":"2026-06-09","o":23259.05,"h":23279.4,"l":23104.45,"c":23242.1,"v":402552937},{"date":"2026-06-10","o":23233.95,"h":23425.35,"l":23184.6,"c":23214.95,"v":380030627},{"date":"2026-06-11","o":23104.4,"h":23327.45,"l":23072.05,"c":23161.6,"v":362996956},{"date":"2026-06-12","o":23412.55,"h":23645.35,"l":23313.9,"c":23622.9,"v":351944432},{"date":"2026-06-15","o":23984.85,"h":24011.4,"l":23817.8,"c":23853.9,"v":398913735},{"date":"2026-06-16","o":23923.9,"h":24002.6,"l":23888.2,"c":23989.15,"v":327307262},{"date":"2026-06-17","o":24044.5,"h":24108.2,"l":23969.7,"c":24085.7,"v":352665809},{"date":"2026-06-18","o":24073.8,"h":24189.25,"l":24036.95,"c":24168,"v":339988612},{"date":"2026-06-19","o":23991.2,"h":24047.2,"l":23901.9,"c":24013.1,"v":447858148},{"date":"2026-06-22","o":24106.6,"h":24168.05,"l":24073.15,"c":24102.9,"v":252821156},{"date":"2026-06-23","o":24071.3,"h":24135.5,"l":23784.95,"c":23824.1,"v":340090069},{"date":"2026-06-24","o":23795.8,"h":24090.05,"l":23789.25,"c":24021.65,"v":395578738},{"date":"2026-06-25","o":24125.85,"h":24261.6,"l":24039,"c":24056,"v":448752143},{"date":"2026-06-29","o":24061.75,"h":24120,"l":23924.55,"c":23946.25,"v":588498045},{"date":"2026-06-30","o":24032.05,"h":24035.55,"l":23829.2,"c":23865.75,"v":449044753},{"date":"2026-07-01","o":23897.65,"h":24049.9,"l":23895.1,"c":24005.85,"v":352148975},{"date":"2026-07-02","o":24062.2,"h":24194.55,"l":24058.8,"c":24175.7,"v":372941283},{"date":"2026-07-03","o":24375.65,"h":24378.15,"l":24252.35,"c":24270.85,"v":326634751},{"date":"2026-07-06","o":24306.85,"h":24458.65,"l":24287.1,"c":24430.35,"v":329356507},{"date":"2026-07-07","o":24464.45,"h":24530.9,"l":24348.95,"c":24398.7,"v":412624457},{"date":"2026-07-08","o":24259.55,"h":24300,"l":23805.2,"c":23882.05,"v":420531527},{"date":"2026-07-09","o":23928.95,"h":24134.7,"l":23925.7,"c":23962.8,"v":384795241},{"date":"2026-07-10","o":24124.7,"h":24228.45,"l":24120.35,"c":24206.9,"v":313072212},{"date":"2026-07-13","o":24039.4,"h":24259.8,"l":24000.2,"c":24211,"v":322678968},{"date":"2026-07-14","o":24068,"h":24157.1,"l":24023.7,"c":24052.05,"v":355829008},{"date":"2026-07-15","o":24085.85,"h":24220.35,"l":24010.55,"c":24078.5,"v":306924577},{"date":"2026-07-16","o":24142.1,"h":24186.5,"l":24050,"c":24072.75,"v":264271962},{"date":"2026-07-17","o":24127.6,"h":24367.3,"l":24099.05,"c":24334.3,"v":387772135},{"date":"2026-07-20","o":24190.05,"h":24266.1,"l":24135.85,"c":24238.5,"v":353095939},{"date":"2026-07-21","o":24216.05,"h":24262.2,"l":24135.65,"c":24187.7,"v":315560285},{"date":"2026-07-22","o":24150.45,"h":24166.3,"l":23961.4,"c":23996.25,"v":304745142},{"date":"2026-07-23","o":23904.8,"h":23990.75,"l":23807.2,"c":23869.6,"v":344042832},{"date":"2026-07-24","o":23666.35,"h":23823.6,"l":23606.3,"c":23767.45,"v":333870912},{"date":"2026-07-27","o":23928.4,"h":24011.6,"l":23891.55,"c":23995.95,"v":319367545},{"date":"2026-07-28","o":23971.25,"h":24041.15,"l":23954.6,"c":23985.35,"v":437827320},{"date":"2026-07-29","o":24176.65,"h":24283.55,"l":24136.75,"c":24250.2,"v":424150311},{"date":"2026-07-30","o":24249.55,"h":24342.95,"l":24187.1,"c":24317.15,"v":400636260},{"date":"2026-07-31","o":24361.45,"h":24429.4,"l":24299.7,"c":24383.6,"v":411693361},{"date":"2026-08-03","o":24572.7,"h":24774.3,"l":24515.15,"c":24774.3,"v":342283085},{"date":"2026-08-04","o":24703.9,"h":24703.9,"l":24427.95,"c":24614.9,"v":296554546},{"date":"2026-08-05","o":24669.2,"h":24677.6,"l":24497.95,"c":24624.65,"v":355518193},{"date":"2026-08-06","o":24641,"h":24677.05,"l":24604.15,"c":24636,"v":344001180},{"date":"2026-08-07","o":24538.9,"h":24630.4,"l":24522.75,"c":24570.65,"v":254819435},{"date":"2026-08-10","o":24581.25,"h":24620.95,"l":24511.1,"c":24583.8,"v":269507262},{"date":"2026-08-11","o":24575.1,"h":24576.85,"l":24429.25,"c":24471.7,"v":271943567},{"date":"2026-08-12","o":24472.45,"h":24473.3,"l":24265.95,"c":24435.95,"v":317552958},{"date":"2026-08-13","o":24431.6,"h":24431.6,"l":24311.4,"c":24395.85,"v":295823169},{"date":"2026-08-14","o":24361.9,"h":24405.2,"l":24296.8,"c":24366,"v":267706410},{"date":"2026-08-17","o":24343.45,"h":24360.1,"l":24226.95,"c":24287.65,"v":225427674},{"date":"2026-08-18","o":24223.85,"h":24269.65,"l":24154.9,"c":24154.9,"v":227027460},{"date":"2026-08-19","o":24152.05,"h":24172.85,"l":24025.65,"c":24078.3,"v":238718813},{"date":"2026-08-20","o":24225.45,"h":24265.15,"l":24184.55,"c":24231.85,"v":253928495},{"date":"2026-08-21","o":24284.05,"h":24284.05,"l":24206.8,"c":24252,"v":259287088},{"date":"2026-08-24","o":24285.05,"h":24313,"l":24144.3,"c":24219.05,"v":236285363},{"date":"2026-08-25","o":24175.75,"h":24334.55,"l":24115.45,"c":24334.55,"v":239453630},{"date":"2026-08-26","o":24341.95,"h":24378.6,"l":24207.75,"c":24207.75,"v":244793446},{"date":"2026-08-27","o":24277.6,"h":24297.45,"l":24090.85,"c":24090.85,"v":323419647},{"date":"2026-08-28","o":24122.6,"h":24188.3,"l":24076.85,"c":24175.65,"v":296127942},{"date":"2026-08-31","o":24117.55,"h":24128.7,"l":23993.6,"c":24080.4,"v":710870778},{"date":"2026-09-01","o":24077.55,"h":24143.15,"l":23952.55,"c":24055.8,"v":334207690},{"date":"2026-09-02","o":23858,"h":23914.45,"l":23786.8,"c":23914.45,"v":318881826},{"date":"2026-09-03","o":23997.95,"h":24025.4,"l":23873.45,"c":23873.45,"v":239174046},{"date":"2026-09-04","o":23910.9,"h":24005.75,"l":23895.85,"c":23897.7,"v":231396362},{"date":"2026-09-07","o":23883.15,"h":23890,"l":23737.9,"c":23779.15,"v":205864370},{"date":"2026-09-08","o":23743.1,"h":23758.95,"l":23623.1,"c":23635.1,"v":230133309},{"date":"2026-09-09","o":23522.05,"h":23571.55,"l":23431.5,"c":23431.5,"v":352925400},{"date":"2026-09-10","o":23446.6,"h":23494.95,"l":23380.1,"c":23477.8,"v":253250004},{"date":"2026-09-11","o":23270.3,"h":23448.1,"l":23231.4,"c":23398.1,"v":293025966},{"date":"2026-09-15","o":23576.15,"h":23592.85,"l":23118.6,"c":23118.6,"v":338835704},{"date":"2026-09-16","o":23201.6,"h":23284.75,"l":23116.1,"c":23217.6,"v":261617344},{"date":"2026-09-17","o":23195.25,"h":23363.55,"l":23193.65,"c":23270.6,"v":259700999},{"date":"2026-09-18","o":23334.7,"h":23389.15,"l":23286.6,"c":23346.4,"v":375346024},{"date":"2026-09-21","o":23330.2,"h":23466.8,"l":23314.8,"c":23414.3,"v":213639227},{"date":"2026-09-22","o":23454.05,"h":23489,"l":23285.75,"c":23329,"v":244146220},{"date":"2026-09-23","o":23352.15,"h":23466.9,"l":23349.55,"c":23446.8,"v":237608688},{"date":"2026-09-24","o":23221.8,"h":23281.95,"l":23046.15,"c":23063.1,"v":271675340},{"date":"2026-09-25","o":23035,"h":23162.7,"l":23020.95,"c":23140.5,"v":242720711},{"date":"2026-09-28","o":23064.9,"h":23080.25,"l":22762.2,"c":22780.25,"v":261457054},{"date":"2026-09-29","o":22732.45,"h":22753.25,"l":22569.65,"c":22716.2,"v":603190549},{"date":"2026-09-30","o":22665,"h":22809.35,"l":22595.2,"c":22620.45,"v":369406892},{"date":"2026-10-01","o":22543.7,"h":22610.6,"l":22217.3,"c":22421.95,"v":451303049},{"date":"2026-10-05","o":22532.4,"h":22621.8,"l":22397.1,"c":22555.75,"v":412554239},{"date":"2026-10-06","o":22603.25,"h":22776.1,"l":22561.6,"c":22776.1,"v":328807304},{"date":"2026-10-07","o":22690.45,"h":22717.65,"l":22546.3,"c":22603.05,"v":359028710},{"date":"2026-10-08","o":22599.05,"h":22599.05,"l":22179.9,"c":22231.8,"v":357536502},{"date":"2026-10-09","o":22314.95,"h":22580.75,"l":22294.75,"c":22520.45,"v":296205852},{"date":"2026-10-12","o":22593.2,"h":22651.1,"l":22304.45,"c":22363.35,"v":258785417},{"date":"2026-10-13","o":22364.15,"h":22721.95,"l":22288.45,"c":22721.95,"v":308881245},{"date":"2026-10-14","o":22715.75,"h":22757.95,"l":22558.95,"c":22622.7,"v":333248082},{"date":"2026-10-15","o":22671.3,"h":23056.4,"l":22637.4,"c":22997.35,"v":370768998},{"date":"2026-10-16","o":23065.1,"h":23149.85,"l":22913.8,"c":23146.15,"v":391557143},{"date":"2026-10-19","o":23150.85,"h":23175.25,"l":22845,"c":22888.95,"v":285859145},{"date":"2026-10-21","o":23016,"h":23120.9,"l":22649.9,"c":22811.35,"v":324842141},{"date":"2026-10-22","o":22687.75,"h":22785,"l":22554.85,"c":22687.65,"v":391598666},{"date":"2026-10-23","o":22742.2,"h":22787.25,"l":22372,"c":22600,"v":364190826},{"date":"2026-10-26","o":22524.4,"h":22753.2,"l":22387.35,"c":22753.2,"v":310215880},{"date":"2026-10-27","o":22708.8,"h":22829.75,"l":22636.85,"c":22749.75,"v":400951492},{"date":"2026-10-28","o":22678,"h":22778.05,"l":22497.7,"c":22698.85,"v":294951884},{"date":"2026-10-29","o":22690.65,"h":22961.95,"l":22656.75,"c":22936.75,"v":344482095},{"date":"2026-10-30","o":22964.5,"h":23118.1,"l":22905.1,"c":23053.1,"v":328562872},{"date":"2026-11-02","o":23222.3,"h":23440.8,"l":23207.05,"c":23440.8,"v":383377838},{"date":"2026-11-03","o":23582.25,"h":23810.85,"l":23482.8,"c":23810.85,"v":408375815},{"date":"2026-11-04","o":23742.25,"h":23960.6,"l":23696.15,"c":23960.6,"v":398421592},{"date":"2026-11-05","o":24378.05,"h":24579.9,"l":24296.3,"c":24536.6,"v":534628921},{"date":"2026-11-06","o":24538.2,"h":25030.35,"l":24388.05,"c":25030.35,"v":490973304},{"date":"2026-11-09","o":25076.4,"h":25084.05,"l":24838.75,"c":25044.65,"v":406189985},{"date":"2026-11-11","o":25337.8,"h":25424.35,"l":25095.35,"c":25255.05,"v":458044741},{"date":"2026-11-12","o":25213.5,"h":25384.8,"l":25142.95,"c":25299.35,"v":349198003},{"date":"2026-11-13","o":25209.85,"h":25246.35,"l":25054.4,"c":25144.3,"v":239573267},{"date":"2026-11-16","o":25206.15,"h":25337.6,"l":25172.1,"c":25291.1,"v":352859164},{"date":"2026-11-17","o":25277.3,"h":25501.35,"l":25267.3,"c":25387.4,"v":342549112},{"date":"2026-11-18","o":25323.15,"h":25390.8,"l":25141.8,"c":25227.95,"v":299995485},{"date":"2026-11-19","o":25186.8,"h":25514.3,"l":25104.8,"c":25514.3,"v":328847731},{"date":"2026-11-20","o":25368,"h":25808.8,"l":25345.2,"c":25800.6,"v":428344270},{"date":"2026-11-23","o":25929.15,"h":25992.6,"l":25343.85,"c":25349.65,"v":519104419}];
+const META = {"first":"2024-11-25","last":"2026-11-23"};
+
+const PRESETS = {
+  spec: { label: 'Rules exactly as given: SL ₹8K, target ₹40K, lock ₹16K→₹1.6K, trail ₹1.6K per ₹1.6K, re-enter on any signal.', p: {} },
+  rec:  { label: 'Same entries and exits, but SL ₹25K (about 1× daily ATR on 2 lots) and no same-side re-entry until the signal has switched off.', p: { stopLoss: 25000, reentry: 'reset' } },
+};
+const FIELDS = [
+  ['stopLoss', 'Stop loss (₹)', 'num', 1000], ['target', 'Target (₹)', 'num', 1000],
+  ['lockAt', 'Lock when MTM ≥ (₹)', 'num', 400], ['lockTo', 'Lock profit at (₹)', 'num', 400],
+  ['trailStep', 'Every further (₹)', 'num', 400], ['trailBy', 'Raise lock by (₹)', 'num', 400],
+  ['lots', 'Lots', 'num', 1], ['costPerTrade', 'Cost / round trip (₹)', 'num', 100],
+  ['capital', 'Capital for return % (₹)', 'num', 50000],
+  ['entryMode', 'Entry fill', 'sel', [['nextOpen', 'Next day open'], ['close', 'Signal candle close']]],
+  ['intrabar', 'Intrabar order', 'sel', [['adverseFirst', 'Adverse first (conservative)'], ['favourableFirst', 'Favourable first']]],
+  ['reentry', 'Re-entry', 'sel', [['immediate', 'On any signal'], ['reset', 'After signal resets']]],
+  ['skipExpiryDays', 'Skip days before monthly expiry', 'num', 1],
+  ['allowLong', 'Longs', 'chk'], ['allowShort', 'Shorts', 'chk'],
+  ['useVwap', 'VWAP filter', 'chk'], ['useHtf', 'Daily + weekly candle filter', 'chk'],
+];
+
+let params = Object.assign({}, Engine.DEFAULTS, PRESETS.rec.p);
+let preset = 'rec';
+let res = null, base = null, selTrade = null;
+
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const inr = x => (x < 0 ? '−' : '') + '₹' + Math.abs(Math.round(x)).toLocaleString('en-IN');
+const inrC = x => { const a = Math.abs(x), s = x < 0 ? '−' : ''; return a >= 1e5 ? s + '₹' + (a / 1e5).toFixed(a >= 1e6 ? 1 : 2).replace(/\.?0+$/, '') + 'L' : a >= 1e3 ? s + '₹' + (a / 1e3).toFixed(0) + 'K' : s + '₹' + Math.round(a); };
+const pct = x => (x * 100).toFixed(1) + '%';
+const cls = x => x > 0 ? 'pos' : x < 0 ? 'neg' : '';
+const fmtDate = d => { const [y, m, dd] = d.split('-'); return dd + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m - 1] + ' ' + y.slice(2); };
+const svgNS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+// ---------- theme ----------
+function setTheme(t) {
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem('bt-theme', t); } catch (e) {}
+  document.querySelectorAll('[data-theme-btn]').forEach(b => b.classList.toggle('active', b.dataset.themeBtn === t));
+  if (res) renderCharts();
+}
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.onclick = () => setTheme(b.dataset.themeBtn));
+let savedTheme = 'auto'; try { savedTheme = localStorage.getItem('bt-theme') || 'auto'; } catch (e) {}
+setTheme(savedTheme);
+
+// ---------- controls ----------
+function buildControls() {
+  const c = $('#controls'); c.innerHTML = '';
+  FIELDS.forEach(([k, label, type, opt]) => {
+    const lab = document.createElement('label');
+    if (type === 'chk') {
+      lab.className = 'chk';
+      lab.innerHTML = `<input type="checkbox" data-k="${k}" ${params[k] ? 'checked' : ''}> ${label}`;
+    } else if (type === 'sel') {
+      lab.innerHTML = `${label}<select data-k="${k}">${opt.map(([v, t]) => `<option value="${v}" ${params[k] === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+    } else {
+      lab.innerHTML = `${label}<input type="number" data-k="${k}" step="${opt}" value="${params[k]}">`;
+    }
+    c.appendChild(lab);
+  });
+  c.querySelectorAll('[data-k]').forEach(inp => inp.onchange = () => {
+    const k = inp.dataset.k;
+    params[k] = inp.type === 'checkbox' ? inp.checked : inp.tagName === 'SELECT' ? inp.value : +inp.value;
+    preset = null; markPreset(); run();
+  });
+}
+function markPreset() {
+  document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+  $('#presetDesc').textContent = preset ? PRESETS[preset].label : 'Custom parameters';
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+  preset = b.dataset.preset; params = Object.assign({}, Engine.DEFAULTS, PRESETS[preset].p);
+  buildControls(); markPreset(); run();
+});
+
+// ---------- run ----------
+function run() {
+  res = Engine.run(BARS, params);
+  base = Engine.run(BARS, Object.assign({}, Engine.DEFAULTS, { intrabar: params.intrabar, entryMode: params.entryMode, costPerTrade: params.costPerTrade }));
+  selTrade = null;
+  renderKPIs(); renderCharts(); renderBreakdown(); renderTrades(); renderSkipped(); renderHeat(); renderAssumptions();
+}
+function renderCharts() { renderEquity(); renderPrice(); renderMonthly(); }
+
+function renderKPIs() {
+  const s = res.stats;
+  const k = [
+    ['Net P&L', inr(s.net), cls(s.net), `${pct(s.returnPct)} on ${inrC(params.capital)} capital`],
+    ['Trades', s.trades, '', `${s.bySide.LONG ? s.bySide.LONG.n : 0} long · ${s.bySide.SHORT ? s.bySide.SHORT.n : 0} short`],
+    ['Win rate', pct(s.winRate), '', `longest losing run: ${s.maxLossStreak}`],
+    ['Profit factor', isFinite(s.profitFactor) ? s.profitFactor.toFixed(2) : '∞', s.profitFactor >= 1 ? 'pos' : 'neg', 'gross wins ÷ gross losses'],
+    ['Max drawdown', inr(-s.maxDD), 'neg', s.maxDDDate ? 'trough ' + fmtDate(s.maxDDDate) : ''],
+    ['Avg win', inrC(s.avgWin), 'pos', 'avg loss ' + inrC(s.avgLoss) + ' · expectancy ' + inrC(s.expectancy) + '/trade'],
+    ['Costs paid', inr(s.costs), '', inr(params.costPerTrade) + ' per round trip'],
+    ['Time in market', pct(s.exposureDays / s.totalDays), '', `${s.exposureDays} of ${s.totalDays} sessions`],
+  ];
+  $('#kpis').innerHTML = k.map(([l, v, c, d]) => `<div class="kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div><div class="d">${d}</div></div>`).join('');
+  $('#subtitle').textContent = `${fmtDate(res.equity[0].date)} to ${fmtDate(res.equity[res.equity.length - 1].date)} · ${res.equity.length} sessions · ${params.lots} lots · NSE bhavcopy daily data`;
+}
+
+// ---------- generic helpers ----------
+function linScale(d0, d1, r0, r1) { const f = x => r0 + (x - d0) / (d1 - d0 || 1) * (r1 - r0); f.inv = y => d0 + (y - r0) / (r1 - r0) * (d1 - d0); return f; }
+function niceTicks(min, max, n) {
+  const span = max - min || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0);
+  const out = []; for (let v = Math.floor(min / step) * step; v < max + step - 1e-9; v += step) out.push(+v.toFixed(6)); return out;
+}
+function monthTicks(dates) { const out = []; let prev = ''; dates.forEach((d, i) => { const m = d.slice(0, 7); if (m !== prev) { out.push([i, d]); prev = m; } }); return out; }
+function frame(container, h, padL) {
+  container.innerHTML = '';
+  const w = Math.max(320, container.clientWidth);
+  const svg = el('svg', { viewBox: `0 0 ${w} ${h}`, height: h, role: 'img' }, container);
+  return { svg, w, h, pad: { l: padL || 58, r: 12, t: 10, b: 24 } };
+}
+function xAxis(f, x, dates) {
+  const g = el('g', {}, f.svg);
+  const ticks = monthTicks(dates); const every = f.w < 560 ? 2 : 1; let lastX = -1e9;
+  ticks.forEach(([i, d], k) => {
+    if (k % every || x(i) - lastX < 34) return; lastX = x(i);
+    el('line', { x1: x(i), x2: x(i), y1: f.pad.t, y2: f.h - f.pad.b, stroke: css('--grid'), 'stroke-width': 1 }, g);
+    const t = el('text', { x: x(i) + 3, y: f.h - 7, fill: css('--muted'), 'font-size': 11 }, g);
+    t.textContent = fmtDate(d).slice(3);
+  });
+}
+function yAxis(f, y, ticks, fmt) {
+  const g = el('g', {}, f.svg);
+  ticks.forEach(v => {
+    el('line', { x1: f.pad.l, x2: f.w - f.pad.r, y1: y(v), y2: y(v), stroke: v === 0 ? css('--axis') : css('--grid'), 'stroke-width': 1 }, g);
+    const t = el('text', { x: f.pad.l - 6, y: y(v) + 4, fill: css('--muted'), 'font-size': 11, 'text-anchor': 'end' }, g);
+    t.textContent = fmt(v);
+  });
+}
+function path(points) { return points.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(''); }
+const tip = $('#tip');
+function showTip(ev, html) {
+  tip.innerHTML = html; tip.style.display = 'block';
+  const r = tip.getBoundingClientRect(); let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+function hover(f, onMove) {
+  const rect = el('rect', { x: f.pad.l, y: f.pad.t, width: f.w - f.pad.l - f.pad.r, height: f.h - f.pad.t - f.pad.b, fill: 'transparent' }, f.svg);
+  const vline = el('line', { y1: f.pad.t, y2: f.h - f.pad.b, stroke: css('--muted'), 'stroke-width': 1, 'stroke-dasharray': '3 3', visibility: 'hidden' }, f.svg);
+  const toLocal = ev => { const b = f.svg.getBoundingClientRect(); return (ev.clientX - b.left) * f.w / b.width; };
+  rect.addEventListener('mousemove', ev => { const xx = toLocal(ev); const vx = onMove(ev, xx); if (vx != null) { vline.setAttribute('x1', vx); vline.setAttribute('x2', vx); vline.setAttribute('visibility', 'visible'); } });
+  rect.addEventListener('mouseleave', () => { hideTip(); vline.setAttribute('visibility', 'hidden'); });
+  return rect;
+}
+
+// ---------- equity + drawdown ----------
+function renderEquity() {
+  const eq = res.equity, be = base.equity, dates = eq.map(e => e.date);
+  const showBase = preset !== 'spec';
+  $('#eqLegend').innerHTML = `<span><i style="background:var(--s1)"></i>Current settings (${inrC(res.stats.net)})</span>` +
+    (showBase ? `<span><i style="background:var(--s2)"></i>As specified (${inrC(base.stats.net)})</span>` : '');
+  $('#eqNote').textContent = 'Each day = closed P&L + open MTM at close';
+  const f = frame($('#eqChart'), 280, 64);
+  const vals = eq.map(e => e.equity).concat(showBase ? be.map(e => e.equity) : []).concat([0]);
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 5);
+  const y = linScale(ticks[0], ticks[ticks.length - 1], f.h - f.pad.b, f.pad.t);
+  const x = linScale(0, eq.length - 1, f.pad.l, f.w - f.pad.r);
+  yAxis(f, y, ticks, inrC); xAxis(f, x, dates);
+  if (showBase) el('path', { d: path(be.map((e, i) => [x(i), y(e.equity)])), fill: 'none', stroke: css('--s2'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, f.svg);
+  el('path', { d: path(eq.map((e, i) => [x(i), y(e.equity)])), fill: 'none', stroke: css('--s1'), 'stroke-width': 2, 'stroke-linejoin': 'round' }, f.svg);
+  const dot1 = el('circle', { r: 4, fill: css('--s1'), stroke: css('--surface'), 'stroke-width': 2, visibility: 'hidden' }, f.svg);
+  const dot2 = el('circle', { r: 4, fill: css('--s2'), stroke: css('--surface'), 'stroke-width': 2, visibility: 'hidden' }, f.svg);
+  const r = hover(f, (ev, xx) => {
+    const i = Math.max(0, Math.min(eq.length - 1, Math.round(x.inv(xx))));
+    dot1.setAttribute('cx', x(i)); dot1.setAttribute('cy', y(eq[i].equity)); dot1.setAttribute('visibility', 'visible');
+    if (showBase) { dot2.setAttribute('cx', x(i)); dot2.setAttribute('cy', y(be[i].equity)); dot2.setAttribute('visibility', 'visible'); }
+    showTip(ev, `<div class="t">${fmtDate(eq[i].date)}</div><div class="r">Current <b>${inr(eq[i].equity)}</b></div>` + (showBase ? `<div class="r">As specified <b>${inr(be[i].equity)}</b></div>` : ''));
+    return x(i);
+  });
+  r.addEventListener('mouseleave', () => { dot1.setAttribute('visibility', 'hidden'); dot2.setAttribute('visibility', 'hidden'); });
+
+  // drawdown
+  const g = frame($('#ddChart'), 140, 64);
+  let peak = 0; const dd = eq.map(e => { peak = Math.max(peak, e.equity); return e.equity - peak; });
+  const dticks = niceTicks(Math.min(...dd, -1000), 0, 3);
+  const y2 = linScale(dticks[0], 0, g.h - g.pad.b, g.pad.t);
+  const x2 = linScale(0, eq.length - 1, g.pad.l, g.w - g.pad.r);
+  yAxis(g, y2, dticks, inrC); xAxis(g, x2, dates);
+  const pts = dd.map((v, i) => [x2(i), y2(v)]);
+  el('path', { d: path(pts) + `L${x2(dd.length - 1)},${y2(0)}L${x2(0)},${y2(0)}Z`, fill: css('--down-fill'), stroke: 'none' }, g.svg);
+  el('path', { d: path(pts), fill: 'none', stroke: css('--down'), 'stroke-width': 1.5 }, g.svg);
+  hover(g, (ev, xx) => { const i = Math.max(0, Math.min(dd.length - 1, Math.round(x2.inv(xx)))); showTip(ev, `<div class="t">${fmtDate(eq[i].date)}</div><div class="r">Drawdown <b>${inr(dd[i])}</b></div>`); return x2(i); });
+}
+
+// ---------- price chart ----------
+function renderPrice() {
+  const s0 = res.series.startIdx, bars = BARS.slice(s0), n = bars.length;
+  const f = frame($('#pxChart'), 380, 58);
+  const lo = Math.min(...bars.map(b => b.l)), hi = Math.max(...bars.map(b => b.h));
+  const ticks = niceTicks(lo, hi, 6);
+  const y = linScale(Math.min(ticks[0], lo), Math.max(ticks[ticks.length - 1], hi), f.h - f.pad.b, f.pad.t);
+  const x = linScale(-0.5, n - 0.5, f.pad.l, f.w - f.pad.r);
+  const bw = Math.max(1, (f.w - f.pad.l - f.pad.r) / n * 0.6);
+  yAxis(f, y, ticks, v => v.toLocaleString('en-IN')); xAxis(f, x, bars.map(b => b.date));
+  // trade spans
+  res.trades.forEach(t => {
+    const a = t.entryIdx - s0, b = t.exitIdx - s0, win = t.net > 0;
+    el('rect', { x: x(a - 0.5), y: f.pad.t, width: Math.max(2, x(b + 0.5) - x(a - 0.5)), height: f.h - f.pad.t - f.pad.b,
+      fill: css(win ? '--up-fill' : '--down-fill'), stroke: selTrade === t.id ? css('--ink') : 'none', 'stroke-width': 1.5 }, f.svg);
+  });
+  // candles
+  const g = el('g', {}, f.svg);
+  bars.forEach((b, i) => {
+    const up = b.c >= b.o, col = css(up ? '--up' : '--down');
+    el('line', { x1: x(i), x2: x(i), y1: y(b.h), y2: y(b.l), stroke: col, 'stroke-width': 1 }, g);
+    el('rect', { x: x(i) - bw / 2, y: y(Math.max(b.o, b.c)), width: bw, height: Math.max(1, Math.abs(y(b.o) - y(b.c))), fill: col }, g);
+  });
+  const line = (arr, color, w) => el('path', { d: path(arr.slice(s0).map((v, i) => [x(i), y(v)])), fill: 'none', stroke: color, 'stroke-width': w, 'stroke-linejoin': 'round' }, f.svg);
+  // supertrend drawn per-direction segments
+  const st = res.series.st.slice(s0), sd = res.series.stDir.slice(s0);
+  let seg = [];
+  const flush = () => { if (seg.length > 1) el('path', { d: path(seg), fill: 'none', stroke: css('--s7'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, f.svg); seg = []; };
+  st.forEach((v, i) => { if (i && sd[i] !== sd[i - 1]) flush(); seg.push([x(i), y(v)]); }); flush();
+  line(res.series.e18, css('--s1'), 2);
+  // markers
+  res.trades.forEach(t => {
+    const a = t.entryIdx - s0, b = t.exitIdx - s0, long = t.side === 'LONG';
+    const ex = x(a), ey = y(t.entry), sz = 6;
+    el('path', { d: long ? `M${ex},${ey - sz}L${ex + sz},${ey + sz}L${ex - sz},${ey + sz}Z` : `M${ex},${ey + sz}L${ex + sz},${ey - sz}L${ex - sz},${ey - sz}Z`,
+      fill: css('--ink'), stroke: css('--surface'), 'stroke-width': 1.5 }, f.svg);
+    el('circle', { cx: x(b), cy: y(t.exit), r: 4.5, fill: css(t.net > 0 ? '--up' : '--down'), stroke: css('--surface'), 'stroke-width': 2 }, f.svg);
+  });
+  const byIdx = {}; res.trades.forEach(t => { for (let i = t.entryIdx; i <= t.exitIdx; i++) byIdx[i - s0] = t; });
+  hover(f, (ev, xx) => {
+    const i = Math.max(0, Math.min(n - 1, Math.round(x.inv(xx)))), b = bars[i], gi = i + s0, t = byIdx[i];
+    showTip(ev, `<div class="t">${fmtDate(b.date)}</div>
+      <div class="r">O / H <b>${b.o.toFixed(1)} / ${b.h.toFixed(1)}</b></div><div class="r">L / C <b>${b.l.toFixed(1)} / ${b.c.toFixed(1)}</b></div>
+      <div class="r">EMA 9 / 21 <b>${res.series.e9[gi].toFixed(0)} / ${res.series.e21[gi].toFixed(0)}</b></div>
+      <div class="r">EMA 18 / 42 <b>${res.series.e18[gi].toFixed(0)} / ${res.series.e42[gi].toFixed(0)}</b></div>
+      <div class="r">Supertrend <b>${res.series.st[gi].toFixed(0)} ${res.series.stDir[gi] > 0 ? '↑' : '↓'}</b></div>
+      <div class="r">Weekly VWAP <b>${res.series.vwap[gi].toFixed(0)}</b></div>` +
+      (t ? `<div class="r" style="margin-top:4px">Trade #${t.id} ${t.side} <b class="${cls(t.net)}">${inr(t.net)}</b></div>` : ''));
+    return x(i);
+  });
+}
+
+// ---------- monthly ----------
+function renderMonthly() {
+  const m = Object.entries(res.stats.monthly);
+  const f = frame($('#moChart'), 240, 56);
+  const vals = m.map(e => e[1]).concat([0]);
+  const ticks = niceTicks(Math.min(...vals), Math.max(...vals), 4);
+  const y = linScale(ticks[0], ticks[ticks.length - 1], f.h - f.pad.b, f.pad.t);
+  yAxis(f, y, ticks, inrC);
+  const bwAll = (f.w - f.pad.l - f.pad.r) / m.length, bw = Math.min(28, bwAll - 4);
+  m.forEach(([k, v], i) => {
+    const cx = f.pad.l + bwAll * (i + 0.5), y0 = y(0), y1 = y(v), top = Math.min(y0, y1), h = Math.max(1, Math.abs(y1 - y0));
+    const r = Math.min(4, h / 2), col = css(v >= 0 ? '--up' : '--down');
+    // rounded data-end, flat at baseline
+    const d = v >= 0
+      ? `M${cx - bw / 2},${y0}V${top + r}Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top}H${cx + bw / 2 - r}Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r}V${y0}Z`
+      : `M${cx - bw / 2},${y0}V${top + h - r}Q${cx - bw / 2},${top + h} ${cx - bw / 2 + r},${top + h}H${cx + bw / 2 - r}Q${cx + bw / 2},${top + h} ${cx + bw / 2},${top + h - r}V${y0}Z`;
+    el('path', { d, fill: col }, f.svg);
+    if (i % (bwAll < 50 ? 2 : 1) === 0) { const t = el('text', { x: cx, y: f.h - 7, 'text-anchor': 'middle', fill: css('--muted'), 'font-size': 11 }, f.svg); t.textContent = fmtDate(k + '-01').slice(3); }
+    const hit = el('rect', { x: cx - bwAll / 2, y: f.pad.t, width: bwAll, height: f.h - f.pad.t - f.pad.b, fill: 'transparent' }, f.svg);
+    hit.addEventListener('mousemove', ev => showTip(ev, `<div class="t">${fmtDate(k + '-01').slice(3)}</div><div class="r">P&amp;L <b class="${cls(v)}">${inr(v)}</b></div>`));
+    hit.addEventListener('mouseleave', hideTip);
+  });
+}
+
+// ---------- tables ----------
+function renderBreakdown() {
+  const s = res.stats;
+  const row = (k, o) => `<tr><td class="l">${k}</td><td>${o.n}</td><td>${o.n ? pct(o.wins / o.n) : '–'}</td><td class="${cls(o.net)}">${inr(o.net)}</td></tr>`;
+  $('#breakdown').innerHTML = `<table><thead><tr><th class="l">By side</th><th>Trades</th><th>Win %</th><th>Net</th></tr></thead><tbody>${Object.entries(s.bySide).map(([k, o]) => row(k, o)).join('')}</tbody></table>
+  <table style="margin-top:14px"><thead><tr><th class="l">By exit reason</th><th>Trades</th><th>Win %</th><th>Net</th></tr></thead><tbody>${Object.entries(s.byReason).sort((a, b) => b[1].n - a[1].n).map(([k, o]) => row(k, o)).join('')}</tbody></table>`;
+}
+
+let sortKey = 'id', sortDir = 1;
+function renderTrades() {
+  const cols = [['id', '#'], ['side', 'Side', 'l'], ['entryDate', 'Entry', 'l'], ['entry', 'Entry px'], ['exitDate', 'Exit', 'l'], ['exit', 'Exit px'], ['qty', 'Qty'], ['points', 'Points'], ['bars', 'Days'], ['mfe', 'Best MTM'], ['gross', 'Gross'], ['cost', 'Costs'], ['net', 'Net'], ['reason', 'Exit reason', 'l']];
+  const rows = res.trades.slice().sort((a, b) => (a[sortKey] > b[sortKey] ? 1 : a[sortKey] < b[sortKey] ? -1 : 0) * sortDir);
+  $('#tradeCount').textContent = `${res.trades.length} trades · click a header to sort`;
+  $('#trades').innerHTML = `<table><thead><tr>${cols.map(([k, t, c]) => `<th class="${c || ''}" data-sort="${k}">${t}${sortKey === k ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead><tbody>${rows.map(t => `<tr data-id="${t.id}" class="${selTrade === t.id ? 'sel' : ''}">
+    <td>${t.id}</td><td class="l"><span class="tag">${t.side}</span></td><td class="l">${fmtDate(t.entryDate)}</td><td>${t.entry.toFixed(1)}</td><td class="l">${fmtDate(t.exitDate)}</td><td>${t.exit.toFixed(1)}</td>
+    <td>${t.qty}</td><td class="${cls(t.points)}">${t.points.toFixed(1)}</td><td>${t.bars}</td><td>${inr(t.mfe)}</td><td class="${cls(t.gross)}">${inr(t.gross)}</td><td>${inr(-t.cost)}</td><td class="${cls(t.net)}"><b>${inr(t.net)}</b></td><td class="l">${t.reason}</td></tr>`).join('')}</tbody></table>`;
+  $('#trades').querySelectorAll('th').forEach(th => th.onclick = () => { const k = th.dataset.sort; sortDir = sortKey === k ? -sortDir : 1; sortKey = k; renderTrades(); });
+  $('#trades').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => { selTrade = +tr.dataset.id; renderTrades(); renderPrice(); $('#pxChart').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+}
+function renderSkipped() {
+  const s = res.skipped;
+  $('#skipped').innerHTML = s.length ? `<table><thead><tr><th class="l">Entry day</th><th class="l">Side</th><th class="l">Why</th></tr></thead><tbody>${s.map(k => `<tr><td class="l">${fmtDate(k.date)}</td><td class="l">${k.dir > 0 ? 'LONG' : 'SHORT'}</td><td class="l">${k.why === 'expiry' ? 'Monthly expiry day' : 'Within ' + params.skipExpiryDays + ' sessions of monthly expiry'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">None.</p>';
+}
+function renderHeat() {
+  const sls = [8000, 12000, 16000, 20000, 25000, 30000];
+  const combos = [['nextOpen', 'adverseFirst', 'Next open · adverse first'], ['nextOpen', 'favourableFirst', 'Next open · favourable first'], ['close', 'adverseFirst', 'Signal close · adverse first'], ['close', 'favourableFirst', 'Signal close · favourable first']];
+  const grid = combos.map(([em, ib]) => sls.map(sl => Engine.run(BARS, Object.assign({}, params, { stopLoss: sl, entryMode: em, intrabar: ib })).stats.net));
+  const maxAbs = Math.max(...grid.flat().map(Math.abs), 1);
+  const cell = v => { const a = Math.min(1, Math.abs(v) / maxAbs) * 0.55 + 0.05; const c = v >= 0 ? '12,163,12' : '208,59,59'; return `<td style="background:rgba(${c},${a.toFixed(2)})">${inrC(v)}</td>`; };
+  $('#heat').innerHTML = `<table class="heat"><thead><tr><th class="l">Entry · intrabar order \\ Stop loss</th>${sls.map(s => `<th>${inrC(s)}${s === params.stopLoss ? ' •' : ''}</th>`).join('')}</tr></thead><tbody>${grid.map((r, i) => `<tr><td class="rowh">${combos[i][2]}${combos[i][0] === params.entryMode && combos[i][1] === params.intrabar ? ' •' : ''}</td>${r.map(cell).join('')}</tr>`).join('')}</tbody></table>
+  <p class="muted" style="margin:8px 0 0">• marks the current setting. Settings that only work in one cell are fragile; look for a block that stays green across rows.</p>`;
+}
+function renderAssumptions() {
+  const p = params;
+  const items = [
+    `Data: NIFTY 50 daily OHLC and index volume from NSE bhavcopy (${META.first} to ${META.last}). Indicators warm up on bars before ${fmtDate(p.startDate)}; the trading window starts on that date.`,
+    `Timeframe: daily candles stand in for the 30-minute chart. The "daily and weekly candle bullish" filter becomes: today's close > today's open, and close > this week's opening price (bearish is the mirror image).`,
+    `VWAP: the bhavcopy has no NIFTY futures, so VWAP is anchored weekly on the index's (high+low+close)/3, weighted by index volume. On a daily chart this plays the same role as session VWAP on a 30-minute chart.`,
+    `Entry: all 7 conditions (Supertrend 10,3 · close vs EMA21 · EMA9 vs EMA21 · EMA18 vs EMA42 · VWAP · daily candle · weekly candle) must hold at the close. Fill: ${p.entryMode === 'close' ? 'at that close' : 'at the next session open (no look-ahead)'}. One position at a time.`,
+    `Exit: first of stop loss ${inr(p.stopLoss)}, target ${inr(p.target)}, trailing lock (at ${inr(p.lockAt)} MTM lock ${inr(p.lockTo)}, then +${inr(p.trailBy)} for every +${inr(p.trailStep)}), or a daily close beyond EMA ${p.emaExit}. Gap opens beyond a level fill at the open.`,
+    `Quantity: ${p.lots} lots × ${p.lotSizeOld} until 30 Dec 2025, then ${p.lots} lots × ${p.lotSizeNew} (NSE lot-size revision). The rupee stop and target stay fixed, so their distance in points changes slightly when the lot size changes.`,
+    `Synthetic future: P&L = points × quantity minus cost of carry (${(p.carryRate * 100).toFixed(1)}% a year on spot; longs pay it, shorts earn it). Options-side effects (IV, skew, bid/ask on the two legs) are folded into ${inr(p.costPerTrade)} per round trip, plus ${inr(p.rollCost)} if a position is held through a monthly expiry.`,
+    `Expiry rule: no fresh entry on the monthly expiry day (last Tuesday, or the previous trading day if that's a holiday) or the ${p.skipExpiryDays} trading days before it. Open positions are not forced out.`,
+    `Not modelled: intraday path inside a daily candle, slippage beyond the fixed cost, margin calls, taxes on profit.`,
+  ];
+  $('#assumptions').innerHTML = items.map(i => `<li>${i}</li>`).join('');
+}
+
+buildControls(); markPreset(); run();
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderCharts, 150); });
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderCharts());
+</script>
+</body>
+</html>
