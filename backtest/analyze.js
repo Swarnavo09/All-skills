@@ -1,0 +1,20 @@
+const fs = require('fs');
+const R = JSON.parse(fs.readFileSync('results/search_stage1.json'));
+const ok = (s, minN) => s.n >= minN && s.win > 0.6 && s.rr >= 2 && s.ddPct < 0.10 && s.worstDayNoGap >= -8000 && s.net > 0;
+const tr = R.filter(r => ok(r.train, 6));
+const both = tr.filter(r => ok(r.test, 6));
+console.log('kept', R.length, '| pass TRAIN', tr.length, '| pass TRAIN+TEST', both.length);
+const desc = r => `${r.key.conds.join('+')}${r.key.adxMin ? '(adx' + r.key.adxMin + ')' : ''} | ${r.key.entry.entryMode}${r.key.entry.limitAtr ? r.key.entry.limitAtr : ''} | ${r.key.dir.allowLong && r.key.dir.allowShort ? 'both' : r.key.dir.allowLong ? 'long' : 'short'} | ${r.key.lots}L SL${r.key.stopLoss} ${r.key.targetR}R ${r.key.trail} mb${r.key.maxBars} ema${r.key.emaExit}`;
+const s = x => `n${x.n} w${(x.win * 100).toFixed(0)}% rr${x.rr.toFixed(1)} net${x.net} dd${(x.ddPct * 100).toFixed(1)}%`;
+both.sort((a, b) => (b.train.net + b.test.net) - (a.train.net + a.test.net)).slice(0, 40).forEach(r => console.log(desc(r), '\n   TRAIN', s(r.train), '| TEST', s(r.test)));
+// how many TEST-passing among relaxed
+const tr2 = R.filter(r => r.train.n >= 6 && r.train.win > 0.6 && r.train.rr >= 2);
+console.log('train win>60 & rr>=2 (no dd req):', tr2.length, ' of which test win>60:', tr2.filter(r => r.test.win > 0.6).length, ' test net>0:', tr2.filter(r => r.test.net > 0).length);
+console.log('\n--- best "worst-period" win rate with rr>=2, DD<10%, net>0, n>=6 in BOTH periods');
+const good = s => s.n >= 6 && s.rr >= 2 && s.ddPct < 0.10 && s.net > 0 && s.worstDayNoGap >= -8000;
+const rob = R.filter(r => good(r.train) && good(r.test)).sort((a, b) => Math.min(b.train.win, b.test.win) - Math.min(a.train.win, a.test.win) || (b.train.net + b.test.net) - (a.train.net + a.test.net));
+console.log('count', rob.length);
+rob.slice(0, 25).forEach(r => console.log(desc(r), '\n   TRAIN', s(r.train), '| TEST', s(r.test)));
+console.log('\n--- win>60% both periods, any rr>=1.0, DD<10%');
+const hw = R.filter(r => [r.train, r.test].every(x => x.n >= 6 && x.win > 0.6 && x.rr >= 1 && x.ddPct < 0.1 && x.net > 0)).sort((a, b) => Math.min(b.train.rr, b.test.rr) - Math.min(a.train.rr, a.test.rr));
+console.log('count', hw.length); hw.slice(0, 15).forEach(r => console.log(desc(r), '\n   TRAIN', s(r.train), '| TEST', s(r.test)));

@@ -78,6 +78,7 @@ button.active { background: var(--ink); color: var(--surface); border-color: var
 .tip .t { font-weight: 600; margin-bottom: 3px; }
 .tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
 .tip .r b { color: var(--ink); font-weight: 500; }
+#limits, #periods, #breakdown { overflow-x: auto; }
 .tablewrap { overflow-x: auto; max-height: 520px; overflow-y: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
 th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -112,15 +113,23 @@ ul.notes li { margin: 4px 0; }
     <div class="presetbar">
       <b>Preset</b>
       <div class="seg" id="presets">
-        <button data-preset="spec">As specified</button>
-        <button data-preset="rec">Recommended</button>
+        <button data-preset="core">New: short-trend (1 lot)</button>
+        <button data-preset="spec">Original rules</button>
+        <button data-preset="rec">Original + SL ₹25K</button>
       </div>
       <span class="muted" id="presetDesc"></span>
     </div>
     <div class="controls" id="controls"></div>
+    <div style="margin-top:12px"><span class="muted" style="font-size:12px">Entry conditions (all ticked ones must be true at the candle close; shorts use the mirror image)</span>
+      <div class="controls" id="condBoxes" style="margin-top:6px"></div></div>
   </section>
 
   <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <section class="card"><h2>Your limits</h2><div id="limits"></div></section>
+    <section class="card"><h2>Consistency: older period vs last 12 months</h2><div id="periods"></div></section>
+  </div>
 
   <section class="card">
     <div class="flex"><h2>Equity curve (daily mark-to-market, after costs)</h2><span class="muted" id="eqNote"></span></div>
@@ -133,7 +142,7 @@ ul.notes li { margin: 4px 0; }
   <section class="card">
     <div class="flex"><h2>NIFTY 50 daily, with trades</h2><span class="muted">Click a trade in the log to highlight it</span></div>
     <div class="legend">
-      <span><i style="background:var(--s1)"></i>EMA 18 (exit)</span>
+      <span id="exitLegend"><i style="background:var(--s1)"></i>EMA 18 (exit)</span>
       <span><i style="background:var(--s7)"></i>Supertrend (10,3)</span>
       <span><i class="box" style="background:var(--up-fill);border:1px solid var(--up)"></i>Winning trade</span>
       <span><i class="box" style="background:var(--down-fill);border:1px solid var(--down)"></i>Losing trade</span>
@@ -165,7 +174,7 @@ ul.notes li { margin: 4px 0; }
 
   <div class="grid2">
     <section class="card">
-      <h2>Signals skipped (monthly expiry block)</h2>
+      <h2>Signals skipped (expiry block or unfilled limit)</h2>
       <div class="tablewrap" id="skipped" style="max-height:260px"></div>
     </section>
     <section class="card">
@@ -184,25 +193,33 @@ const BARS = /*__DATA__*/;
 const META = /*__META__*/;
 
 const PRESETS = {
-  spec: { label: 'Rules exactly as given: SL ₹8K, target ₹40K, lock ₹16K→₹1.6K, trail ₹1.6K per ₹1.6K, re-enter on any signal.', p: {} },
-  rec:  { label: 'Same entries and exits, but SL ₹25K (about 1× daily ATR on 2 lots) and no same-side re-entry until the signal has switched off.', p: { stopLoss: 25000, reentry: 'reset' } },
+  core: { label: 'Short only, 1 lot: close below Supertrend, red daily and weekly candle, RSI 30-50. Enter at the close, SL ₹7K, target 2.5R (₹17.5K), exit on close above EMA9 or after 5 sessions.',
+    p: { startDate: '2025-01-01', lots: 1, lotSizeOld: 65, lotSizeNew: 65, costPerTrade: 400, rollCost: 400, capital: 200000, allowLong: false, allowShort: true,
+      conds: ['st', 'day', 'week', 'rsi'], rsiLo: 50, rsiHi: 70, entryMode: 'close', stopLoss: 7000, targetR: 2.5, maxBars: 5, emaExit: 9, lockAt: 0, reentry: 'immediate' } },
+  spec: { label: 'Your original rules: all 7 conditions, 2 lots, SL ₹8K, target ₹40K, lock ₹16K→₹1.6K, trail ₹1.6K per ₹1.6K, last 12 months.', p: {} },
+  rec:  { label: 'Original entries and exits with SL ₹25K and re-entry only after the signal resets (breaks your ₹8K daily limit).', p: { stopLoss: 25000, reentry: 'reset' } },
 };
+const DAY_LIMIT = 8000, SPLIT = '2025-11-24';
 const FIELDS = [
-  ['stopLoss', 'Stop loss (₹)', 'num', 1000], ['target', 'Target (₹)', 'num', 1000],
-  ['lockAt', 'Lock when MTM ≥ (₹)', 'num', 400], ['lockTo', 'Lock profit at (₹)', 'num', 400],
+  ['stopLoss', 'Stop loss (₹)', 'num', 500], ['targetR', 'Target in R (0 = use ₹ target)', 'num', 0.5], ['target', 'Target (₹)', 'num', 1000],
+  ['lockAt', 'Lock when MTM ≥ (₹, 0 = off)', 'num', 400], ['lockTo', 'Lock profit at (₹)', 'num', 400],
   ['trailStep', 'Every further (₹)', 'num', 400], ['trailBy', 'Raise lock by (₹)', 'num', 400],
+  ['emaExit', 'Exit on close beyond EMA (0 = off)', 'num', 1], ['maxBars', 'Time exit after N sessions (0 = off)', 'num', 1],
   ['lots', 'Lots', 'num', 1], ['costPerTrade', 'Cost / round trip (₹)', 'num', 100],
-  ['capital', 'Capital for return % (₹)', 'num', 50000],
-  ['entryMode', 'Entry fill', 'sel', [['nextOpen', 'Next day open'], ['close', 'Signal candle close']]],
+  ['capital', 'Capital for return / DD % (₹)', 'num', 50000],
+  ['startDate', 'Backtest window', 'sel', [['2025-01-01', 'Jan 2025 to now (2 periods)'], ['2025-11-24', 'Last 12 months']]],
+  ['entryMode', 'Entry fill', 'sel', [['close', 'Signal candle close'], ['nextOpen', 'Next day open'], ['limit', 'Next-day pullback limit']]],
+  ['limitAtr', 'Pullback limit (× ATR)', 'num', 0.05],
   ['intrabar', 'Intrabar order', 'sel', [['adverseFirst', 'Adverse first (conservative)'], ['favourableFirst', 'Favourable first']]],
   ['reentry', 'Re-entry', 'sel', [['immediate', 'On any signal'], ['reset', 'After signal resets']]],
   ['skipExpiryDays', 'Skip days before monthly expiry', 'num', 1],
+  ['rsiLo', 'RSI band low (long)', 'num', 1], ['rsiHi', 'RSI band high (long)', 'num', 1], ['adxMin', 'ADX minimum', 'num', 1],
   ['allowLong', 'Longs', 'chk'], ['allowShort', 'Shorts', 'chk'],
-  ['useVwap', 'VWAP filter', 'chk'], ['useHtf', 'Daily + weekly candle filter', 'chk'],
 ];
+const COND_KEYS = ['st', 'ema21', 'e9_21', 'e18_42', 'vwap', 'day', 'week', 'rsi', 'adx'];
 
-let params = Object.assign({}, Engine.DEFAULTS, PRESETS.rec.p);
-let preset = 'rec';
+let params = Object.assign({}, Engine.DEFAULTS, PRESETS.core.p);
+let preset = 'core';
 let res = null, base = null, selTrade = null;
 
 const $ = s => document.querySelector(s);
@@ -241,6 +258,13 @@ function buildControls() {
     }
     c.appendChild(lab);
   });
+  const cur = params.conds || Engine.ALL_CONDS;
+  $('#condBoxes').innerHTML = COND_KEYS.map(k => `<label class="chk"><input type="checkbox" data-cond="${k}" ${cur.includes(k) ? 'checked' : ''}> ${Engine.COND_LABELS[k]}</label>`).join('');
+  $('#condBoxes').querySelectorAll('[data-cond]').forEach(inp => inp.onchange = () => {
+    params.conds = [...$('#condBoxes').querySelectorAll('[data-cond]:checked')].map(x => x.dataset.cond);
+    params.useVwap = true; params.useHtf = true;
+    preset = null; markPreset(); run();
+  });
   c.querySelectorAll('[data-k]').forEach(inp => inp.onchange = () => {
     const k = inp.dataset.k;
     params[k] = inp.type === 'checkbox' ? inp.checked : inp.tagName === 'SELECT' ? inp.value : +inp.value;
@@ -259,12 +283,41 @@ document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
 // ---------- run ----------
 function run() {
   res = Engine.run(BARS, params);
-  base = Engine.run(BARS, Object.assign({}, Engine.DEFAULTS, { intrabar: params.intrabar, entryMode: params.entryMode, costPerTrade: params.costPerTrade }));
+  const same = ['startDate', 'lots', 'lotSizeOld', 'lotSizeNew', 'lotChangeDate', 'costPerTrade', 'rollCost', 'capital', 'intrabar'];
+  base = Engine.run(BARS, Object.assign({}, Engine.DEFAULTS, Object.fromEntries(same.map(k => [k, params[k]]))));
   selTrade = null;
-  renderKPIs(); renderCharts(); renderBreakdown(); renderTrades(); renderSkipped(); renderHeat(); renderAssumptions();
+  renderLimits(); renderKPIs(); renderCharts(); renderBreakdown(); renderTrades(); renderSkipped(); renderHeat(); renderAssumptions();
 }
 function renderCharts() { renderEquity(); renderPrice(); renderMonthly(); }
 
+function periodStats(r, from, to) {
+  const t = r.trades.filter(x => x.entryDate >= from && x.entryDate <= to);
+  const eq = r.equity.filter(e => e.date >= from && e.date <= to);
+  const startEq = (r.equity.filter(e => e.date < from).pop() || { equity: 0 }).equity;
+  let peak = startEq, dd = 0; eq.forEach(e => { peak = Math.max(peak, e.equity); dd = Math.max(dd, peak - e.equity); });
+  const w = t.filter(x => x.net > 0), l = t.filter(x => x.net <= 0);
+  const aw = w.length ? w.reduce((a, x) => a + x.net, 0) / w.length : 0, al = l.length ? l.reduce((a, x) => a + x.net, 0) / l.length : 0;
+  const days = {}; t.filter(x => !x.gap).forEach(x => days[x.exitDate] = (days[x.exitDate] || 0) + x.net);
+  return { n: t.length, win: t.length ? w.length / t.length : 0, aw, al, rr: al ? aw / -al : 0, net: t.reduce((a, x) => a + x.net, 0), dd, ddPct: dd / r.params.capital, worst: Math.min(0, ...Object.values(days)) };
+}
+function renderLimits() {
+  const s = res.stats;
+  const chk = (ok, label, val) => `<tr><td class="l"><span style="color:var(${ok ? '--up' : '--down'});font-weight:600">${ok ? '✓ Pass' : '✗ Fail'}</span></td><td class="l">${label}</td><td>${val}</td></tr>`;
+  $('#limits').innerHTML = `<table><tbody>
+    ${chk(s.worstDayNoGap >= -DAY_LIMIT, 'Worst day loss ≤ ₹8,000 (gap days excluded)', inr(s.worstDayNoGap) + (s.worstDay < s.worstDayNoGap ? ` <span class="muted">(gap day ${inr(s.worstDay)})</span>` : ''))}
+    ${chk(s.ddPct < 0.10, 'Max drawdown < 10% of capital', pct(s.ddPct) + ' of ' + inrC(params.capital))}
+    ${chk(s.winRate > 0.60, 'Win rate > 60%', pct(s.winRate) + ` (${s.wins} of ${s.trades})`)}
+    ${chk(s.rr >= 2, 'Average win ≥ 2 × average loss', s.rr.toFixed(2) + ' : 1')}
+    ${chk(s.plannedRR >= 2, 'Target ≥ 2 × stop loss', s.plannedRR.toFixed(1) + ' : 1')}
+  </tbody></table>`;
+  if (params.startDate < SPLIT) {
+    const a = periodStats(res, params.startDate, '2025-11-21'), b = periodStats(res, SPLIT, '2099-01-01');
+    const row = (nm, x) => `<tr><td class="l">${nm}</td><td>${x.n}</td><td>${pct(x.win)}</td><td>${x.rr.toFixed(1)}</td><td class="${cls(x.net)}">${inr(x.net)}</td><td>${pct(x.ddPct)}</td><td>${inr(x.worst)}</td></tr>`;
+    $('#periods').innerHTML = `<table><thead><tr><th class="l">Period</th><th>Trades</th><th>Win %</th><th>Win:loss</th><th>Net</th><th>Max DD</th><th>Worst day*</th></tr></thead><tbody>
+      ${row(fmtDate(params.startDate) + ' – 21 Nov 25', a)}${row('24 Nov 25 – now', b)}</tbody></table>
+      <p class="muted" style="margin:8px 0 0">*excluding gap days. A setup that only works in one period is luck.</p>`;
+  } else $('#periods').innerHTML = '<p class="muted">Choose the "Jan 2025 to now" window to compare the two periods.</p>';
+}
 function renderKPIs() {
   const s = res.stats;
   const k = [
@@ -336,8 +389,9 @@ function hover(f, onMove) {
 function renderEquity() {
   const eq = res.equity, be = base.equity, dates = eq.map(e => e.date);
   const showBase = preset !== 'spec';
+  const baseName = 'Your original rules';
   $('#eqLegend').innerHTML = `<span><i style="background:var(--s1)"></i>Current settings (${inrC(res.stats.net)})</span>` +
-    (showBase ? `<span><i style="background:var(--s2)"></i>As specified (${inrC(base.stats.net)})</span>` : '');
+    (showBase ? `<span><i style="background:var(--s2)"></i>${baseName}, same window and lots (${inrC(base.stats.net)})</span>` : '');
   $('#eqNote').textContent = 'Each day = closed P&L + open MTM at close';
   const f = frame($('#eqChart'), 280, 64);
   const vals = eq.map(e => e.equity).concat(showBase ? be.map(e => e.equity) : []).concat([0]);
@@ -353,7 +407,7 @@ function renderEquity() {
     const i = Math.max(0, Math.min(eq.length - 1, Math.round(x.inv(xx))));
     dot1.setAttribute('cx', x(i)); dot1.setAttribute('cy', y(eq[i].equity)); dot1.setAttribute('visibility', 'visible');
     if (showBase) { dot2.setAttribute('cx', x(i)); dot2.setAttribute('cy', y(be[i].equity)); dot2.setAttribute('visibility', 'visible'); }
-    showTip(ev, `<div class="t">${fmtDate(eq[i].date)}</div><div class="r">Current <b>${inr(eq[i].equity)}</b></div>` + (showBase ? `<div class="r">As specified <b>${inr(be[i].equity)}</b></div>` : ''));
+    showTip(ev, `<div class="t">${fmtDate(eq[i].date)}</div><div class="r">Current <b>${inr(eq[i].equity)}</b></div>` + (showBase ? `<div class="r">Original rules <b>${inr(be[i].equity)}</b></div>` : ''));
     return x(i);
   });
   r.addEventListener('mouseleave', () => { dot1.setAttribute('visibility', 'hidden'); dot2.setAttribute('visibility', 'hidden'); });
@@ -400,7 +454,8 @@ function renderPrice() {
   let seg = [];
   const flush = () => { if (seg.length > 1) el('path', { d: path(seg), fill: 'none', stroke: css('--s7'), 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, f.svg); seg = []; };
   st.forEach((v, i) => { if (i && sd[i] !== sd[i - 1]) flush(); seg.push([x(i), y(v)]); }); flush();
-  line(res.series.e18, css('--s1'), 2);
+  line(res.series.eExit, css('--s1'), 2);
+  $('#exitLegend').innerHTML = `<i style="background:var(--s1)"></i>EMA ${res.series.exitLen}${params.emaExit ? ' (exit)' : ''}`;
   // markers
   res.trades.forEach(t => {
     const a = t.entryIdx - s0, b = t.exitIdx - s0, long = t.side === 'LONG';
@@ -468,29 +523,39 @@ function renderTrades() {
 }
 function renderSkipped() {
   const s = res.skipped;
-  $('#skipped').innerHTML = s.length ? `<table><thead><tr><th class="l">Entry day</th><th class="l">Side</th><th class="l">Why</th></tr></thead><tbody>${s.map(k => `<tr><td class="l">${fmtDate(k.date)}</td><td class="l">${k.dir > 0 ? 'LONG' : 'SHORT'}</td><td class="l">${k.why === 'expiry' ? 'Monthly expiry day' : 'Within ' + params.skipExpiryDays + ' sessions of monthly expiry'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">None.</p>';
+  $('#skipped').innerHTML = s.length ? `<table><thead><tr><th class="l">Entry day</th><th class="l">Side</th><th class="l">Why</th></tr></thead><tbody>${s.map(k => `<tr><td class="l">${fmtDate(k.date)}</td><td class="l">${k.dir > 0 ? 'LONG' : 'SHORT'}</td><td class="l">${k.why === 'expiry' ? 'Monthly expiry day' : k.why === 'limit not filled' ? 'Pullback limit not filled' : 'Within ' + params.skipExpiryDays + ' sessions of monthly expiry'}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">None.</p>';
 }
 function renderHeat() {
-  const sls = [8000, 12000, 16000, 20000, 25000, 30000];
-  const combos = [['nextOpen', 'adverseFirst', 'Next open · adverse first'], ['nextOpen', 'favourableFirst', 'Next open · favourable first'], ['close', 'adverseFirst', 'Signal close · adverse first'], ['close', 'favourableFirst', 'Signal close · favourable first']];
+  const sl0 = params.stopLoss;
+  const sls = [...new Set([0.5, 0.7, 0.85, 1, 1.15, 1.5].map(m => Math.round(sl0 * m / 100) * 100))];
+  const combos = [['close', 'adverseFirst', 'Signal close · adverse first'], ['nextOpen', 'adverseFirst', 'Next open · adverse first'],
+    ['limit', 'adverseFirst', 'Pullback limit · adverse first'], [params.entryMode, 'favourableFirst', 'Current entry · favourable first']];
   const grid = combos.map(([em, ib]) => sls.map(sl => Engine.run(BARS, Object.assign({}, params, { stopLoss: sl, entryMode: em, intrabar: ib })).stats.net));
   const maxAbs = Math.max(...grid.flat().map(Math.abs), 1);
   const cell = v => { const a = Math.min(1, Math.abs(v) / maxAbs) * 0.55 + 0.05; const c = v >= 0 ? '12,163,12' : '208,59,59'; return `<td style="background:rgba(${c},${a.toFixed(2)})">${inrC(v)}</td>`; };
-  $('#heat').innerHTML = `<table class="heat"><thead><tr><th class="l">Entry · intrabar order \\ Stop loss</th>${sls.map(s => `<th>${inrC(s)}${s === params.stopLoss ? ' •' : ''}</th>`).join('')}</tr></thead><tbody>${grid.map((r, i) => `<tr><td class="rowh">${combos[i][2]}${combos[i][0] === params.entryMode && combos[i][1] === params.intrabar ? ' •' : ''}</td>${r.map(cell).join('')}</tr>`).join('')}</tbody></table>
-  <p class="muted" style="margin:8px 0 0">• marks the current setting. Settings that only work in one cell are fragile; look for a block that stays green across rows.</p>`;
+  const over = sl => sl + params.costPerTrade > DAY_LIMIT;
+  $('#heat').innerHTML = `<table class="heat"><thead><tr><th class="l">Entry · intrabar order \\ Stop loss</th>${sls.map(s => `<th>${inrC(s)}${s === sl0 ? ' •' : ''}${over(s) ? ' †' : ''}</th>`).join('')}</tr></thead><tbody>${grid.map((r, i) => `<tr><td class="rowh">${combos[i][2]}${i === 0 && params.entryMode === 'close' && params.intrabar === 'adverseFirst' || i === 1 && params.entryMode === 'nextOpen' && params.intrabar === 'adverseFirst' || i === 2 && params.entryMode === 'limit' && params.intrabar === 'adverseFirst' || i === 3 && params.intrabar === 'favourableFirst' ? ' •' : ''}</td>${r.map(cell).join('')}</tr>`).join('')}</tbody></table>
+  <p class="muted" style="margin:8px 0 0">• marks the current setting. † a stop this wide, plus costs, breaks the ₹8,000 daily-loss limit. Settings that only work in one cell are fragile; look for a block that stays green.</p>`;
 }
 function renderAssumptions() {
-  const p = params;
+  const p = params, cl = res.conds;
+  const condTxt = cl.map(k => Engine.COND_LABELS[k] + (k === 'rsi' ? ` (long ${p.rsiLo}–${p.rsiHi}, short ${100 - p.rsiHi}–${100 - p.rsiLo})` : k === 'adx' ? ` (≥ ${p.adxMin})` : '')).join(' · ');
+  const tgt = p.targetR > 0 ? `${p.targetR}R = ${inr(p.stopLoss * p.targetR)}` : inr(p.target);
+  const exits = [`stop loss ${inr(p.stopLoss)} on trade MTM`, `target ${tgt}`];
+  if (p.lockAt > 0) exits.push(`lock ${inr(p.lockTo)} once MTM reaches ${inr(p.lockAt)}` + (p.trailStep > 0 ? `, then +${inr(p.trailBy)} for every +${inr(p.trailStep)}` : ''));
+  if (p.emaExit) exits.push(`a daily close beyond EMA ${p.emaExit}`);
+  if (p.maxBars) exits.push(`the close of session ${p.maxBars} in the trade`);
+  const fill = p.entryMode === 'close' ? 'at that candle\'s close (in practice about 3:20–3:25 PM, using the near-final price)' : p.entryMode === 'limit' ? `with a next-day limit order ${p.limitAtr}× ATR(14) better than the signal close, cancelled if not filled` : 'at the next session open';
+  const qty = p.lotSizeOld === p.lotSizeNew ? `${p.lots} lot${p.lots > 1 ? 's' : ''} × ${p.lotSizeNew} (today's NIFTY lot size) throughout` : `${p.lots} lots × ${p.lotSizeOld} until 30 Dec 2025, then ${p.lots} lots × ${p.lotSizeNew} (NSE lot-size revision)`;
   const items = [
-    `Data: NIFTY 50 daily OHLC and index volume from NSE bhavcopy (${META.first} to ${META.last}). Indicators warm up on bars before ${fmtDate(p.startDate)}; the trading window starts on that date.`,
-    `Timeframe: daily candles stand in for the 30-minute chart. The "daily and weekly candle bullish" filter becomes: today's close > today's open, and close > this week's opening price (bearish is the mirror image).`,
-    `VWAP: the bhavcopy has no NIFTY futures, so VWAP is anchored weekly on the index's (high+low+close)/3, weighted by index volume. On a daily chart this plays the same role as session VWAP on a 30-minute chart.`,
-    `Entry: all 7 conditions (Supertrend 10,3 · close vs EMA21 · EMA9 vs EMA21 · EMA18 vs EMA42 · VWAP · daily candle · weekly candle) must hold at the close. Fill: ${p.entryMode === 'close' ? 'at that close' : 'at the next session open (no look-ahead)'}. One position at a time.`,
-    `Exit: first of stop loss ${inr(p.stopLoss)}, target ${inr(p.target)}, trailing lock (at ${inr(p.lockAt)} MTM lock ${inr(p.lockTo)}, then +${inr(p.trailBy)} for every +${inr(p.trailStep)}), or a daily close beyond EMA ${p.emaExit}. Gap opens beyond a level fill at the open.`,
-    `Quantity: ${p.lots} lots × ${p.lotSizeOld} until 30 Dec 2025, then ${p.lots} lots × ${p.lotSizeNew} (NSE lot-size revision). The rupee stop and target stay fixed, so their distance in points changes slightly when the lot size changes.`,
-    `Synthetic future: P&L = points × quantity minus cost of carry (${(p.carryRate * 100).toFixed(1)}% a year on spot; longs pay it, shorts earn it). Options-side effects (IV, skew, bid/ask on the two legs) are folded into ${inr(p.costPerTrade)} per round trip, plus ${inr(p.rollCost)} if a position is held through a monthly expiry.`,
-    `Expiry rule: no fresh entry on the monthly expiry day (last Tuesday, or the previous trading day if that's a holiday) or the ${p.skipExpiryDays} trading days before it. Open positions are not forced out.`,
-    `Not modelled: intraday path inside a daily candle, slippage beyond the fixed cost, margin calls, taxes on profit.`,
+    `Data: NIFTY 50 daily OHLC and index volume from NSE bhavcopy (${META.first} to ${META.last}; older data isn't available from this source). Indicators warm up on bars before ${fmtDate(p.startDate)}.`,
+    `Timeframe: daily candles stand in for the 30-minute chart. "Daily/weekly candle" means close vs today's open and close vs this week's opening price. VWAP is weekly-anchored on (high+low+close)/3 weighted by index volume.`,
+    `Entry (${p.allowLong && p.allowShort ? 'long and short' : p.allowLong ? 'long only' : 'short only'}): ${condTxt || 'no conditions'} must all hold at the close. Fill ${fill}. One position at a time.`,
+    `Exit: first of ${exits.join(', ')}. A gap open beyond a level fills at the open.`,
+    `Quantity: ${qty}. Costs ${inr(p.costPerTrade)} per round trip, plus ${inr(p.rollCost)} if held through a monthly expiry.`,
+    `Synthetic future (buy ATM CE + sell ATM PE): P&L = points × quantity minus carry at ${(p.carryRate * 100).toFixed(1)}% a year (longs pay it, shorts earn it). Option IV, skew and leg spreads are inside the cost figure.`,
+    `Expiry rule: no fresh entry on the monthly expiry day (last Tuesday from Sep 2025, last Thursday before) or the ${p.skipExpiryDays} trading days before it.`,
+    `Not modelled: the path inside a daily candle (see Intrabar order), slippage beyond the fixed cost, margin changes, taxes on profit.`,
   ];
   $('#assumptions').innerHTML = items.map(i => `<li>${i}</li>`).join('');
 }
