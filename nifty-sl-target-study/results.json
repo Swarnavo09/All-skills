@@ -1,0 +1,267 @@
+[
+ {
+  "name": "CURRENT  T40k / SL8k / lock16k->1.6k trail 1.6k",
+  "target": 40000,
+  "sl": 8000,
+  "trail": [
+   16000,
+   1600,
+   1600,
+   1600
+  ],
+  "pess": {
+   "trades": 161,
+   "net": 79729,
+   "win": 29,
+   "avg": 495,
+   "maxdd": 155955,
+   "worst": -8150,
+   "best": 39850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 705329,
+   "win": 47,
+   "avg": 4381,
+   "maxdd": 68565,
+   "worst": -8150,
+   "best": 39850
+  }
+ },
+ {
+  "name": "T40k / SL8k / no trail",
+  "target": 40000,
+  "sl": 8000,
+  "trail": null,
+  "pess": {
+   "trades": 161,
+   "net": 32601,
+   "win": 29,
+   "avg": 202,
+   "maxdd": 189060,
+   "worst": -8150,
+   "best": 39850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 224601,
+   "win": 31,
+   "avg": 1395,
+   "maxdd": 189060,
+   "worst": -8150,
+   "best": 39850
+  }
+ },
+ {
+  "name": "T20k / SL5k / no trail",
+  "target": 20000,
+  "sl": 5000,
+  "trail": null,
+  "pess": {
+   "trades": 161,
+   "net": -67881,
+   "win": 20,
+   "avg": -422,
+   "maxdd": 155931,
+   "worst": -5150,
+   "best": 19850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 732119,
+   "win": 40,
+   "avg": 4547,
+   "maxdd": 51500,
+   "worst": -5150,
+   "best": 19850
+  }
+ },
+ {
+  "name": "T20k / SL8k / no trail",
+  "target": 20000,
+  "sl": 8000,
+  "trail": null,
+  "pess": {
+   "trades": 161,
+   "net": -105837,
+   "win": 29,
+   "avg": -657,
+   "maxdd": 222081,
+   "worst": -8150,
+   "best": 19850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 510163,
+   "win": 42,
+   "avg": 3169,
+   "maxdd": 74772,
+   "worst": -8150,
+   "best": 19850
+  }
+ },
+ {
+  "name": "T15k / SL5k / no trail",
+  "target": 15000,
+  "sl": 5000,
+  "trail": null,
+  "pess": {
+   "trades": 161,
+   "net": -171153,
+   "win": 20,
+   "avg": -1063,
+   "maxdd": 223603,
+   "worst": -5150,
+   "best": 14850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 688847,
+   "win": 47,
+   "avg": 4279,
+   "maxdd": 48922,
+   "worst": -5150,
+   "best": 14850
+  }
+ },
+ {
+  "name": "T25k / SL6k / no trail",
+  "target": 25000,
+  "sl": 6000,
+  "trail": null,
+  "pess": {
+   "trades": 161,
+   "net": 27502,
+   "win": 24,
+   "avg": 171,
+   "maxdd": 97900,
+   "worst": -6150,
+   "best": 24850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 585502,
+   "win": 35,
+   "avg": 3637,
+   "maxdd": 67650,
+   "worst": -6150,
+   "best": 24850
+  }
+ },
+ {
+  "name": "T30k / SL6k / lock12k->6k trail 3k/3k",
+  "target": 30000,
+  "sl": 6000,
+  "trail": [
+   12000,
+   6000,
+   3000,
+   3000
+  ],
+  "pess": {
+   "trades": 161,
+   "net": 127996,
+   "win": 24,
+   "avg": 795,
+   "maxdd": 91634,
+   "worst": -6150,
+   "best": 29850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 1099996,
+   "win": 51,
+   "avg": 6832,
+   "maxdd": 46922,
+   "worst": -6150,
+   "best": 29850
+  }
+ },
+ {
+  "name": "T40k / SL8k / lock12k->6k trail 2k/2k",
+  "target": 40000,
+  "sl": 8000,
+  "trail": [
+   12000,
+   6000,
+   2000,
+   2000
+  ],
+  "pess": {
+   "trades": 161,
+   "net": 163506,
+   "win": 29,
+   "avg": 1016,
+   "maxdd": 124384,
+   "worst": -8150,
+   "best": 39850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 1149506,
+   "win": 53,
+   "avg": 7140,
+   "maxdd": 62022,
+   "worst": -8150,
+   "best": 39850
+  }
+ },
+ {
+  "name": "T25k / SL5k / lock10k->5k trail 2.5k/2.5k",
+  "target": 25000,
+  "sl": 5000,
+  "trail": [
+   10000,
+   5000,
+   2500,
+   2500
+  ],
+  "pess": {
+   "trades": 161,
+   "net": 10386,
+   "win": 20,
+   "avg": 65,
+   "maxdd": 105059,
+   "worst": -5150,
+   "best": 24850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 1235386,
+   "win": 57,
+   "avg": 7673,
+   "maxdd": 37150,
+   "worst": -5150,
+   "best": 24850
+  }
+ },
+ {
+  "name": "T20k / SL5k / lock10k->5k trail 2k/2k",
+  "target": 20000,
+  "sl": 5000,
+  "trail": [
+   10000,
+   5000,
+   2000,
+   2000
+  ],
+  "pess": {
+   "trades": 161,
+   "net": -65371,
+   "win": 20,
+   "avg": -406,
+   "maxdd": 155059,
+   "worst": -5150,
+   "best": 19850
+  },
+  "opt": {
+   "trades": 161,
+   "net": 1078629,
+   "win": 57,
+   "avg": 6700,
+   "maxdd": 37150,
+   "worst": -5150,
+   "best": 19850
+  }
+ }
+]
